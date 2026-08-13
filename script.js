@@ -1,6 +1,6 @@
 // ============================================================
 // JOELL SHOP - MAIN SCRIPT (FULL WORKING + FIREBASE AUTH)
-// VERSION 2.5.0 - FIXED ALL ISSUES
+// VERSION 2.5.1 - FIXED DISPLAY ISSUES
 // ============================================================
 
 // ============================================================
@@ -536,9 +536,15 @@ function renderMenus() {
     const scriptGrid = document.getElementById('gridScript');
     const topupGrid = document.getElementById('gridTopup');
     
-    if (hostingGrid) hostingGrid.innerHTML = renderMenuCards(products.filter(p => p.category === 'hosting'));
-    if (scriptGrid) scriptGrid.innerHTML = renderMenuCards(products.filter(p => p.category === 'script'));
-    if (topupGrid) topupGrid.innerHTML = renderMenuCards(products.filter(p => p.category === 'topup'));
+    if (hostingGrid) {
+        hostingGrid.innerHTML = renderMenuCards(products.filter(p => p.category === 'hosting'));
+    }
+    if (scriptGrid) {
+        scriptGrid.innerHTML = renderMenuCards(products.filter(p => p.category === 'script'));
+    }
+    if (topupGrid) {
+        topupGrid.innerHTML = renderMenuCards(products.filter(p => p.category === 'topup'));
+    }
 }
 
 function renderMenuCards(productList) {
@@ -1835,4 +1841,4 @@ function handleAdminDocUpload(input) {
     }
 }
 
-console.log('✅ JOELL SHOP Script v2.5.0 Loaded Successfully!');
+console.log('✅ JOELL SHOP Script v2.5.1 Loaded Successfully!');
