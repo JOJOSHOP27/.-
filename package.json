@@ -1,0 +1,19 @@
+{
+  "name": "joell-shop",
+  "version": "2.5.0",
+  "description": "JOELL SHOP - Digital Store with LZPedia Payment Gateway",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve .",
+    "dev": "serve ."
+  },
+  "dependencies": {
+    "serve": "^14.0.0"
+  },
+  "devDependencies": {
+    "@vercel/node": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
