@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <!-- ✅ TAMBAHKAN INI -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     
@@ -59,21 +60,9 @@
             <h1 class="hero-title">Solusi Digital <span class="typing-text" id="typingText"></span><span class="cursor">|</span></h1>
             <p class="hero-subtitle">Bot WhatsApp, Hosting, Script & Topup Game Terpercaya</p>
             <div class="hero-stats-row">
-                <div class="hero-stat">
-                    <i class="fas fa-star"></i>
-                    <span class="stat-value">4.9</span>
-                    <span class="stat-label">Rating</span>
-                </div>
-                <div class="hero-stat">
-                    <i class="fas fa-users"></i>
-                    <span class="stat-value">8.2K</span>
-                    <span class="stat-label">Pelanggan</span>
-                </div>
-                <div class="hero-stat">
-                    <i class="fas fa-bolt"></i>
-                    <span class="stat-value">24/7</span>
-                    <span class="stat-label">Support</span>
-                </div>
+                <div class="hero-stat"><i class="fas fa-star"></i><span class="stat-value">4.9</span><span class="stat-label">Rating</span></div>
+                <div class="hero-stat"><i class="fas fa-users"></i><span class="stat-value">8.2K</span><span class="stat-label">Pelanggan</span></div>
+                <div class="hero-stat"><i class="fas fa-bolt"></i><span class="stat-value">24/7</span><span class="stat-label">Support</span></div>
             </div>
         </div>
 
@@ -114,38 +103,10 @@
                 <button class="status-refresh" id="refreshStatus" title="Refresh"><i class="fas fa-sync-alt"></i></button>
             </div>
             <div class="server-grid" id="serverGrid">
-                <div class="server-item">
-                    <div class="server-dot"></div>
-                    <div class="server-info">
-                        <div class="server-name">Node-1 Jakarta</div>
-                        <div class="server-meta">Panel Pterodactyl</div>
-                    </div>
-                    <div class="server-ping">12ms</div>
-                </div>
-                <div class="server-item">
-                    <div class="server-dot"></div>
-                    <div class="server-info">
-                        <div class="server-name">Node-2 Singapore</div>
-                        <div class="server-meta">Bot Hosting</div>
-                    </div>
-                    <div class="server-ping">24ms</div>
-                </div>
-                <div class="server-item">
-                    <div class="server-dot warning"></div>
-                    <div class="server-info">
-                        <div class="server-name">Node-3 Tokyo</div>
-                        <div class="server-meta">Game Server</div>
-                    </div>
-                    <div class="server-ping" style="color:var(--orange)">89ms</div>
-                </div>
-                <div class="server-item">
-                    <div class="server-dot"></div>
-                    <div class="server-info">
-                        <div class="server-name">API Gateway</div>
-                        <div class="server-meta">Main API</div>
-                    </div>
-                    <div class="server-ping">5ms</div>
-                </div>
+                <div class="server-item"><div class="server-dot"></div><div class="server-info"><div class="server-name">Node-1 Jakarta</div><div class="server-meta">Panel Pterodactyl</div></div><div class="server-ping">12ms</div></div>
+                <div class="server-item"><div class="server-dot"></div><div class="server-info"><div class="server-name">Node-2 Singapore</div><div class="server-meta">Bot Hosting</div></div><div class="server-ping">24ms</div></div>
+                <div class="server-item"><div class="server-dot warning"></div><div class="server-info"><div class="server-name">Node-3 Tokyo</div><div class="server-meta">Game Server</div></div><div class="server-ping" style="color:var(--orange)">89ms</div></div>
+                <div class="server-item"><div class="server-dot"></div><div class="server-info"><div class="server-name">API Gateway</div><div class="server-meta">Main API</div></div><div class="server-ping">5ms</div></div>
             </div>
         </div>
 
@@ -292,7 +253,7 @@
             </div>
 
             <div class="profile-footer-info" style="margin-top: 40px; padding: 20px; border-top: 1px solid var(--border-subtle); text-align: center;">
-                <p style="font-size: 0.8rem; color: var(--text-muted);">JOELL SHOP v2.5.0 • Digital Solutions</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted);">JOELL SHOP v2.4.0 • Digital Solutions</p>
             </div>
         </div>
     </div>
@@ -503,7 +464,7 @@
     </div>
 </div>
 
-<!-- LOGIN MODAL -->
+<!-- ===== LOGIN MODAL (dengan Tab Registrasi/Login) ===== -->
 <div class="modal-overlay" id="loginOverlay">
     <div class="modal-box" style="max-width:440px; border: 1px solid rgba(99, 102, 241, 0.3); box-shadow: 0 0 40px rgba(0,0,0,0.6);">
         <button class="modal-close" id="loginCloseBtn"><i class="fas fa-times"></i></button>
@@ -633,10 +594,12 @@
 <div class="modal-overlay" id="paymentOverlay">
     <div class="modal-box payment-modal">
         <button class="modal-close" id="paymentCloseBtn"><i class="fas fa-times"></i></button>
-
-        <h2><i class="fas fa-credit-card" style="color:var(--accent-light);"></i> Pembayaran</h2>
-        <p>Selesaikan pembayaran pesanan Anda</p>
-
+        
+        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:4px;">
+            <i class="fas fa-credit-card" style="color:var(--accent-light);"></i> Pembayaran
+        </h2>
+        <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">Selesaikan pembayaran pesanan Anda</p>
+        
         <div class="payment-section">
             <div class="section-label"><i class="fas fa-shopping-bag"></i> Ringkasan Pesanan</div>
             <div class="order-summary-box">
@@ -656,23 +619,58 @@
                 </button>
             </div>
 
-            <!-- QRIS SECTION -->
             <div id="paymentQrisSection">
-                <div id="qrisDisplayContainer">
-                    <div class="qris-placeholder">
-                        <i class="fas fa-qrcode"></i>
-                        <p>Klik tombol di bawah untuk generate QRIS</p>
+                <div class="payment-qris-container" id="qrisContainer">
+                    <div class="qris-placeholder" id="qrisPlaceholder">
+                        <div style="text-align:center;">
+                            <i class="fas fa-qrcode" style="font-size:3rem;color:var(--accent-light);display:block;margin-bottom:8px;"></i>
+                            <p style="font-weight:700;color:var(--text-primary);margin-bottom:4px;">Siap Membuat Invoice</p>
+                            <small style="color:var(--text-muted);display:block;">Klik tombol di bawah untuk generate QRIS dari LZPedia</small>
+                        </div>
+                    </div>
+                    <div id="qrisImageWrapper" style="display:none;">
+                        <img id="qrisImage" src="" alt="QRIS Code" loading="lazy">
+                        <p class="qris-success-text">
+                            <i class="fas fa-check-circle"></i> Scan QRIS untuk membayar
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="payment-details" id="paymentDetails" style="display:none;">
+                    <div class="detail-row">
+                        <span class="label">Invoice ID</span>
+                        <span class="value" id="invoiceId" style="font-family:var(--font-mono);font-size:0.8rem;">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Total</span>
+                        <span class="value total" id="invoiceTotal">Rp 0</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Biaya Admin</span>
+                        <span class="value" id="invoiceFee">Rp 0</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Status</span>
+                        <span class="value"><span class="payment-status-badge pending" id="invoiceStatusBadge">⏳ Menunggu</span></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Kadaluarsa</span>
+                        <span class="value" id="invoiceExpiry">-</span>
                     </div>
                 </div>
 
-                <div class="payment-actions" style="padding: 0 24px 16px;">
-                    <button class="btn-pay" id="createInvoiceBtn"><i class="fas fa-qrcode"></i> Buat Invoice QRIS</button>
+                <div class="payment-timer" id="paymentTimer" style="display:none;">
+                    <i class="fas fa-hourglass-half"></i> <span id="timerDisplay">15:00</span>
+                </div>
+
+                <div class="payment-actions">
+                    <button class="btn-pay" id="createInvoiceBtn"><i class="fas fa-qrcode"></i> Buat Invoice</button>
+                    <button class="btn-check-status" id="checkStatusBtn" style="display:none;"><i class="fas fa-sync-alt"></i> Cek Status</button>
                 </div>
             </div>
 
-            <!-- BANK SECTION -->
             <div id="paymentBankSection" style="display:none;">
-                <div class="bank-details">
+                <div class="payment-details">
                     <div class="detail-row">
                         <span class="label">Bank</span>
                         <span class="value">BCA</span>
@@ -690,21 +688,18 @@
                         <span class="value total" id="bankTotal">Rp 0</span>
                     </div>
                 </div>
-                <p style="color:var(--text-muted);font-size:0.8rem;text-align:center;margin:8px 24px;">
+                <p style="color:var(--text-muted);font-size:0.8rem;text-align:center;margin:8px 0;">
                     <i class="fas fa-info-circle"></i> Transfer sesuai total dan kirim bukti ke admin
                 </p>
-                <div style="padding: 0 24px 16px;">
-                    <button class="btn-copy-bank" onclick="copyBankInfo()"><i class="fas fa-copy"></i> Salin Info Bank</button>
-                </div>
+                <button class="btn-pay" onclick="copyBankInfo()"><i class="fas fa-copy"></i> Salin Info Bank</button>
             </div>
         </div>
 
-        <!-- INVOICE HISTORY -->
-        <div class="invoice-history-section">
+        <div class="payment-section" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-subtle);">
             <div class="section-label"><i class="fas fa-file-invoice"></i> Riwayat Invoice Saya</div>
             <div class="invoice-history-list" id="invoiceHistoryList">
-                <div class="history-empty">
-                    <i class="fas fa-file-invoice"></i>
+                <div style="text-align:center;padding:20px;color:var(--text-muted);">
+                    <i class="fas fa-file-invoice" style="font-size:2rem;display:block;margin-bottom:8px;opacity:0.5;"></i>
                     <p>Belum ada invoice</p>
                 </div>
             </div>
@@ -712,9 +707,9 @@
     </div>
 </div>
 
-</div>
-
+<!-- ============================================================ -->
 <!-- TOAST & BACK TO TOP -->
+<!-- ============================================================ -->
 <div class="toast-container" id="toastContainer"></div>
 <button class="back-to-top" id="backToTop" title="Kembali ke atas">
     <i class="fas fa-arrow-up"></i>
