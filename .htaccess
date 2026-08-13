@@ -1,0 +1,63 @@
+# ============================================================
+# JOELL SHOP - .htaccess
+# Untuk mengatur rewrite rules dan CORS
+# ============================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Redirect ke index.html untuk semua route (SPA)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.html [L]
+</IfModule>
+
+# CORS Headers untuk API
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+</IfModule>
+
+# Cache Control untuk asset statis
+<FilesMatch "\.(css|js|png|jpg|jpeg|gif|ico|svg|webp)$">
+    Header set Cache-Control "max-age=31536000, public"
+</FilesMatch>
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "no-referrer-when-downgrade"
+</IfModule>
+
+# ============================================================
+# LZPEDIA PROXY - API Routing
+# ============================================================
+<IfModule mod_rewrite.c>
+    # Redirect API requests ke lzpedia.php (jika ada)
+    RewriteCond %{REQUEST_URI} ^/api/lzpedia$
+    RewriteRule ^api/lzpedia$ api/lzpedia.php [L]
+</IfModule>
+
+# ============================================================
+# ERROR PAGES
+# ============================================================
+ErrorDocument 404 /index.html
+ErrorDocument 403 /index.html
+
+# ============================================================
+# COMPRESSION
+# ============================================================
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json
+</IfModule>
+
+# ============================================================
+# BLOCK BAD BOTS
+# ============================================================
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTP_USER_AGENT} (ahrefs|semrush|bot|spider|crawler) [NC]
+    RewriteRule .* - [F,L]
+</IfModule>
