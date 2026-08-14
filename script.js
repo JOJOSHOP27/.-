@@ -1,6 +1,6 @@
 // ============================================================
 // JOELL SHOP - MAIN SCRIPT (FULL WORKING + FIREBASE AUTH)
-// VERSION 2.4.1 - FIXED AUTH
+// VERSION 2.5.0 - FULL FIXED
 // ============================================================
 
 // ============================================================
@@ -147,7 +147,7 @@ const firebaseConfig = {
 };
 
 // ============================================================
-// INIT CLOUD SYNC - FIXED: CEK SDK TERSEDIA
+// INIT CLOUD SYNC
 // ============================================================
 function initCloudSync() {
     if (firebaseInitialized) return;
@@ -172,7 +172,6 @@ function initCloudSync() {
             firestore = firebase.firestore();
         }
         
-        // Setup auth state listener
         firebaseAuth.onAuthStateChanged(async (user) => {
             if (user) {
                 const userData = await getCurrentUserData();
@@ -191,7 +190,6 @@ function initCloudSync() {
             }
         });
         
-        // Cloud connection status
         const connectedRef = db.ref(".info/connected");
         connectedRef.on("value", (snap) => {
             const statusDot = document.getElementById('cloudStatusDot');
@@ -207,7 +205,6 @@ function initCloudSync() {
             }
         });
 
-        // Sync orders from cloud
         db.ref('orders').on('value', (snapshot) => {
             const data = snapshot.val();
             if (data) {
@@ -248,7 +245,6 @@ function syncOrdersToCloud() {
 // FIREBASE AUTHENTICATION FUNCTIONS
 // ============================================================
 
-// GET CURRENT USER DATA FROM FIRESTORE
 async function getCurrentUserData() {
     const user = firebaseAuth ? firebaseAuth.currentUser : null;
     if (!user) return null;
@@ -285,7 +281,7 @@ async function getCurrentUserData() {
 }
 
 // ============================================================
-// REGISTER - FIXED: VALIDASI & ERROR HANDLING
+// REGISTER
 // ============================================================
 async function registerUserCloud(nama, email, password) {
     try {
@@ -330,7 +326,7 @@ async function registerUserCloud(nama, email, password) {
 }
 
 // ============================================================
-// LOGIN - FIXED: ERROR CODE MAPPING
+// LOGIN
 // ============================================================
 async function loginUserCloud(email, password) {
     try {
@@ -363,7 +359,7 @@ async function loginUserCloud(email, password) {
 }
 
 // ============================================================
-// LOGOUT - FIXED: BERSIH TOTAL + REFRESH
+// LOGOUT
 // ============================================================
 async function logoutUserCloud() {
     try {
@@ -446,7 +442,7 @@ function handleGoogleLogin(response) {
 }
 
 // ============================================================
-// HANDLE REGISTER & LOGIN (BUTTON CLICK)
+// HANDLE REGISTER & LOGIN
 // ============================================================
 
 async function handleRegister() {
@@ -714,7 +710,7 @@ function addToCart(productId, variantName, variantPrice) {
 }
 
 // ============================================================
-// ORDERS
+// ORDERS - DENGAN TOMBOL CEK STATUS
 // ============================================================
 function renderOrdersList() {
     const container = document.getElementById('ordersListContainer');
@@ -743,6 +739,10 @@ function renderOrdersList() {
 
     container.innerHTML = '<div class="orders-list">' + myOrders.map(o => {
         const itemsText = o.items.map(i => `${i.name} (${i.variant})`).join(', ');
+        const paymentStatus = o.paymentStatus || 'pending';
+        const payLabel = paymentStatus === 'paid' ? '✅ Lunas' : (paymentStatus === 'expired' ? '❌ Kadaluarsa' : '⏳ Menunggu');
+        const payColor = paymentStatus === 'paid' ? 'var(--green)' : (paymentStatus === 'expired' ? 'var(--red)' : 'var(--gold)');
+        
         return `
             <div class="order-card" onclick="openOrderChat('${o.id}')">
                 <div class="order-card-header">
@@ -753,6 +753,27 @@ function renderOrdersList() {
                 <div class="order-meta">
                     <span>${new Date(o.createdAt).toLocaleString('id-ID', {day:'2-digit', month:'short', year:'numeric'})}</span>
                     <span class="order-total">Rp ${o.total.toLocaleString()}</span>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+                    <span style="font-size:0.7rem;color:${payColor};background:${payColor}15;padding:4px 12px;border-radius:30px;border:1px solid ${payColor}30;">
+                        <i class="fas fa-credit-card"></i> ${payLabel}
+                    </span>
+                    ${o.invoiceId && (o.status === 'pending' || o.status === 'read') ? `
+                        <button onclick="event.stopPropagation(); checkOrderPaymentStatus('${o.id}')" 
+                                style="font-size:0.65rem;background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;border:none;padding:6px 16px;border-radius:30px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                            <i class="fas fa-sync-alt"></i> Cek Status
+                        </button>
+                    ` : ''}
+                    ${o.invoiceId && o.status === 'expired' ? `
+                        <span style="font-size:0.65rem;color:var(--red);background:rgba(239,68,68,0.1);padding:4px 12px;border-radius:30px;border:1px solid rgba(239,68,68,0.2);">
+                            <i class="fas fa-exclamation-circle"></i> Kadaluarsa
+                        </span>
+                    ` : ''}
+                    ${!o.invoiceId && o.status === 'pending' ? `
+                        <span style="font-size:0.65rem;color:var(--text-muted);background:var(--bg-primary);padding:4px 12px;border-radius:30px;border:1px solid var(--border-subtle);">
+                            <i class="fas fa-info-circle"></i> Belum ada invoice
+                        </span>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -800,6 +821,61 @@ function renderOrderChatMessages() {
 }
 
 // ============================================================
+// CEK STATUS PEMBAYARAN DARI HALAMAN PESANAN
+// ============================================================
+function checkOrderPaymentStatus(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) {
+        showToast('Error', 'Pesanan tidak ditemukan', 'error');
+        return;
+    }
+    
+    if (!order.invoiceId) {
+        showToast('Info', 'Pesanan ini belum memiliki invoice. Silakan buka payment untuk generate QRIS.', 'info');
+        return;
+    }
+    
+    if (typeof window.checkInvoiceStatus === 'function') {
+        window.checkInvoiceStatus(order.invoiceId);
+    } else {
+        showToast('Error', 'Sistem pembayaran tidak tersedia', 'error');
+    }
+}
+
+// ============================================================
+// UPDATE ORDER PAYMENT STATUS
+// ============================================================
+function updateOrderPaymentStatus(invoiceId, status) {
+    if (!orders || !Array.isArray(orders)) return;
+    
+    const order = orders.find(o => o.invoiceId === invoiceId || o.id === invoiceId);
+    if (order) {
+        if (status === 'paid') {
+            order.status = 'processing';
+            order.statusLabel = 'Diproses';
+            order.paymentStatus = 'paid';
+            if (order.timeline && order.timeline[0]) {
+                order.timeline[0].completed = true;
+                order.timeline[0].time = new Date().toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit'});
+            }
+            showToast('✅ Pembayaran Lunas!', `Pesanan #${order.id} sedang diproses`, 'success', 5000);
+        } else if (status === 'expired') {
+            order.status = 'pending';
+            order.statusLabel = 'Kadaluarsa';
+            order.paymentStatus = 'expired';
+            showToast('⏰ Kadaluarsa', `Invoice #${order.id} sudah kadaluarsa`, 'warning');
+        }
+        localStorage.setItem('joellOrders', JSON.stringify(orders));
+        syncOrdersToCloud();
+        renderOrdersList();
+        if (isAdminLoggedIn) {
+            renderAdminOrders();
+            updateAdminStats();
+        }
+    }
+}
+
+// ============================================================
 // ADMIN
 // ============================================================
 function enterAdminMode() {
@@ -838,8 +914,9 @@ function renderAdminOrders() {
                     <strong>${o.userName}</strong> · ${o.userEmail} · ${o.userPhone || '-'}
                 </div>
                 <div class="admin-order-products">${itemsText}</div>
-                <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                     <span style="font-weight:800;color:var(--accent-light);">Rp ${o.total.toLocaleString()}</span>
+                    <span style="font-size:0.7rem;color:var(--text-muted);">Invoice: ${o.invoiceId || '-'}</span>
                     <button class="admin-chat-btn" onclick="openAdminChat('${o.id}')">
                         <i class="fas fa-comments"></i> Balas Chat
                     </button>
@@ -973,7 +1050,6 @@ function renderProfilePage() {
         const userOrders = orders.filter(o => o.userId === currentUser.id);
         document.getElementById('statOrderCount').textContent = userOrders.length;
         
-        // ✅ FIXED: Logout button with confirm
         const logoutBtn = document.getElementById('btnProfileLogoutPage');
         if (logoutBtn) {
             logoutBtn.onclick = async function() {
@@ -1072,7 +1148,231 @@ function doSearch() {
 }
 
 // ============================================================
-// EVENT LISTENERS - DOMContentLoaded (FIXED)
+// UNREAD BADGES
+// ============================================================
+function updateUnreadBadges() {
+    if (!orders || !Array.isArray(orders)) return;
+    
+    let totalUnreadUser = 0;
+    let totalUnreadAdmin = 0;
+
+    orders.forEach(order => {
+        if (!order.chat || !Array.isArray(order.chat)) return;
+        const lastMsg = order.chat[order.chat.length - 1];
+        if (!lastMsg) return;
+
+        if (lastMsg.from === 'admin') {
+            if (currentUser && order.userId === currentUser.id) {
+                totalUnreadUser++;
+            }
+        } else if (lastMsg.from === 'user') {
+            totalUnreadAdmin++;
+        }
+    });
+
+    const navBadge = document.getElementById('navOrdersBadge');
+    if (navBadge) {
+        if (totalUnreadUser > 0) {
+            navBadge.textContent = totalUnreadUser;
+            navBadge.style.display = 'block';
+        } else {
+            navBadge.style.display = 'none';
+        }
+    }
+
+    const adminBadge = document.getElementById('adminChatBadge');
+    if (adminBadge) {
+        if (totalUnreadAdmin > 0) {
+            adminBadge.textContent = totalUnreadAdmin;
+            adminBadge.style.display = 'block';
+        } else {
+            adminBadge.style.display = 'none';
+        }
+    }
+}
+
+// ============================================================
+// HANDLE CHAT FILE UPLOAD
+// ============================================================
+function handleChatFileUpload(input, senderType) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+        showToast('Error', 'Gambar terlalu besar (Maks 10MB)', 'error');
+        input.value = '';
+        return;
+    }
+
+    const orderId = senderType === 'user' ? currentOrderChatId : currentAdminChatId;
+    if (!orderId) {
+        showToast('Error', 'Sesi chat tidak ditemukan.', 'error');
+        input.value = '';
+        return;
+    }
+
+    const orderIndex = orders.findIndex(o => o.id === orderId);
+    if (orderIndex === -1) {
+        showToast('Error', 'Data pesanan tidak ditemukan.', 'error');
+        input.value = '';
+        return;
+    }
+
+    showToast('Chat', 'Sedang mengirim gambar...', 'info');
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        fetch('https://api.imgur.com/3/image', {
+            method: 'POST',
+            headers: { 'Authorization': 'Client-ID ' + CONFIG.imgurClientId },
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        })
+        .then(result => {
+            if (result.success && result.data && result.data.link) {
+                const newMessage = {
+                    from: senderType,
+                    text: '',
+                    image: result.data.link,
+                    time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})
+                };
+
+                if (!orders[orderIndex].chat) orders[orderIndex].chat = [];
+                orders[orderIndex].chat.push(newMessage);
+
+                localStorage.setItem('joellOrders', JSON.stringify(orders));
+                syncOrdersToCloud();
+
+                if (senderType === 'user') renderOrderChatMessages();
+                else renderAdminChatMessages();
+
+                showToast('Berhasil', 'Gambar berhasil dikirim!', 'success');
+            } else {
+                throw new Error('Gagal mendapatkan link gambar.');
+            }
+        })
+        .catch(error => {
+            console.error("Image Upload Error:", error);
+            showToast('Error', 'Gagal kirim gambar: ' + error.message, 'error', 5000);
+        });
+    } catch (error) {
+        showToast('Error', 'Gagal kirim gambar: ' + error.message, 'error', 5000);
+    } finally {
+        input.value = '';
+    }
+}
+
+function handleAdminDocUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    const orderId = currentAdminChatId;
+    if (!orderId) {
+        showToast('Error', 'ID Pesanan tidak ditemukan.', 'error');
+        input.value = '';
+        return;
+    }
+    
+    const orderIndex = orders.findIndex(o => o.id === orderId);
+    if (orderIndex === -1) {
+        showToast('Error', 'Data pesanan tidak ditemukan.', 'error');
+        input.value = '';
+        return;
+    }
+
+    if (file.size <= 500 * 1024) {
+        showToast('Admin', 'Mengkonversi file ke base64...', 'info');
+        try {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64 = e.target.result;
+                const newMessage = {
+                    from: 'admin',
+                    text: `📄 File: ${file.name}`,
+                    file: base64,
+                    fileName: file.name,
+                    time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})
+                };
+                
+                if (!orders[orderIndex].chat) orders[orderIndex].chat = [];
+                orders[orderIndex].chat.push(newMessage);
+                
+                localStorage.setItem('joellOrders', JSON.stringify(orders));
+                syncOrdersToCloud();
+                renderAdminChatMessages();
+                showToast('Berhasil', 'File berhasil dikirim (Base64)!', 'success');
+            };
+            reader.readAsDataURL(file);
+        } catch (err) {
+            showToast('Error', 'Gagal memproses file.', 'error');
+        } finally {
+            input.value = '';
+        }
+        return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+        showToast('Error', 'File terlalu besar. Maksimal 20MB.', 'error');
+        input.value = '';
+        return;
+    }
+
+    showToast('Admin', 'Sedang mengupload file...', 'info');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        fetch('https://file.io/?expires=1w&autoDelete=false', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) throw new Error(`Server error: ${response.status}`);
+            return response.json();
+        })
+        .then(result => {
+            if (result.success || result.link) {
+                const fileUrl = result.link || result.url || result.file;
+                if (!fileUrl) throw new Error('URL file tidak ditemukan.');
+                
+                const newMessage = {
+                    from: 'admin',
+                    text: `📄 File: ${file.name}`,
+                    file: fileUrl,
+                    fileName: file.name,
+                    time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})
+                };
+                
+                if (!orders[orderIndex].chat) orders[orderIndex].chat = [];
+                orders[orderIndex].chat.push(newMessage);
+                
+                localStorage.setItem('joellOrders', JSON.stringify(orders));
+                syncOrdersToCloud();
+                renderAdminChatMessages();
+                showToast('Berhasil', 'File berhasil dikirim!', 'success');
+            } else {
+                throw new Error(result.message || 'Gagal mengunggah file.');
+            }
+        })
+        .catch(error => {
+            console.error("File Upload Error:", error);
+            showToast('Error', 'Gagal upload: ' + error.message, 'error', 5000);
+        });
+    } catch (error) {
+        showToast('Error', 'Gagal upload: ' + error.message, 'error', 5000);
+    } finally {
+        input.value = '';
+    }
+}
+
+// ============================================================
+// DOM CONTENT LOADED - MAIN INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ JOELL SHOP Initializing...');
@@ -1083,6 +1383,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateUserUI();
     renderOrdersList();
     renderProfilePage();
+    initCloudSync();
 
     // ===== TAB SWITCH LOGIN/REGISTER =====
     const loginTabs = document.querySelectorAll('.login-tab');
@@ -1110,10 +1411,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-
-    // ===== ✅ FIXED: Login & Register Button - PAKAI onclick DI HTML =====
-    // Tombol sudah pakai onclick="handleLogin()" dan onclick="handleRegister()" di HTML
-    // Jangan tambahkan addEventListener lagi supaya tidak konflik!
 
     // ===== CLICK EVENT UNTUK MENU CARD =====
     document.querySelectorAll('.grid-menu').forEach(grid => {
@@ -1213,6 +1510,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 total: total,
                 status: 'pending',
                 statusLabel: 'Menunggu Pembayaran',
+                paymentStatus: 'pending',
                 createdAt: new Date().toISOString(),
                 timeline: [
                     { step: 'Menunggu Pembayaran', desc: 'Silakan selesaikan pembayaran', time: '-', completed: false },
@@ -1510,9 +1808,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ============================================================
-    // ===== FIX: SEMUA TOMBOL CLOSE (X) DI MODAL =====
-    // ============================================================
+    // ===== CLOSE BUTTONS =====
     document.querySelectorAll('.modal-close, .detail-close, .cart-close').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -1545,7 +1841,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ===== TOMBOL CLOSE KHUSUS =====
+    // ===== CLOSE BUTTONS SPECIFIC =====
     const closeButtons = ['loginCloseBtn', 'profileCloseBtn', 'checkoutCloseBtn', 'detailCloseBtn', 
                           'topupCloseBtn', 'paymentCloseBtn', 'orderChatCloseBtn', 'adminChatCloseBtn', 'cartCloseBtn'];
     closeButtons.forEach(function(id) {
@@ -1601,228 +1897,4 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================================
 initCloudSync();
 
-// ============================================================
-// UNREAD BADGES
-// ============================================================
-function updateUnreadBadges() {
-    if (!orders || !Array.isArray(orders)) return;
-    
-    let totalUnreadUser = 0;
-    let totalUnreadAdmin = 0;
-
-    orders.forEach(order => {
-        if (!order.chat || !Array.isArray(order.chat)) return;
-        const lastMsg = order.chat[order.chat.length - 1];
-        if (!lastMsg) return;
-
-        if (lastMsg.from === 'admin') {
-            if (currentUser && order.userId === currentUser.id) {
-                totalUnreadUser++;
-            }
-        } else if (lastMsg.from === 'user') {
-            totalUnreadAdmin++;
-        }
-    });
-
-    const navBadge = document.getElementById('navOrdersBadge');
-    if (navBadge) {
-        if (totalUnreadUser > 0) {
-            navBadge.textContent = totalUnreadUser;
-            navBadge.style.display = 'block';
-        } else {
-            navBadge.style.display = 'none';
-        }
-    }
-
-    const adminBadge = document.getElementById('adminChatBadge');
-    if (adminBadge) {
-        if (totalUnreadAdmin > 0) {
-            adminBadge.textContent = totalUnreadAdmin;
-            adminBadge.style.display = 'block';
-        } else {
-            adminBadge.style.display = 'none';
-        }
-    }
-}
-
-// ============================================================
-// HANDLE CHAT FILE UPLOAD
-// ============================================================
-function handleChatFileUpload(input, senderType) {
-    const file = input.files[0];
-    if (!file) return;
-
-    if (file.size > 10 * 1024 * 1024) {
-        showToast('Error', 'Gambar terlalu besar (Maks 10MB)', 'error');
-        input.value = '';
-        return;
-    }
-
-    const orderId = senderType === 'user' ? currentOrderChatId : currentAdminChatId;
-    if (!orderId) {
-        showToast('Error', 'Sesi chat tidak ditemukan.', 'error');
-        input.value = '';
-        return;
-    }
-
-    const orderIndex = orders.findIndex(o => o.id === orderId);
-    if (orderIndex === -1) {
-        showToast('Error', 'Data pesanan tidak ditemukan.', 'error');
-        input.value = '';
-        return;
-    }
-
-    showToast('Chat', 'Sedang mengirim gambar...', 'info');
-
-    const formData = new FormData();
-    formData.append('image', file);
-
-    try {
-        fetch('https://api.imgur.com/3/image', {
-            method: 'POST',
-            headers: { 'Authorization': 'Client-ID ' + CONFIG.imgurClientId },
-            body: formData
-        })
-        .then(response => {
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            return response.json();
-        })
-        .then(result => {
-            if (result.success && result.data && result.data.link) {
-                const newMessage = {
-                    from: senderType,
-                    text: '',
-                    image: result.data.link,
-                    time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})
-                };
-
-                if (!orders[orderIndex].chat) orders[orderIndex].chat = [];
-                orders[orderIndex].chat.push(newMessage);
-
-                localStorage.setItem('joellOrders', JSON.stringify(orders));
-                syncOrdersToCloud();
-
-                if (senderType === 'user') renderOrderChatMessages();
-                else renderAdminChatMessages();
-
-                showToast('Berhasil', 'Gambar berhasil dikirim!', 'success');
-            } else {
-                throw new Error('Gagal mendapatkan link gambar.');
-            }
-        })
-        .catch(error => {
-            console.error("Image Upload Error:", error);
-            showToast('Error', 'Gagal kirim gambar: ' + error.message, 'error', 5000);
-        });
-    } catch (error) {
-        showToast('Error', 'Gagal kirim gambar: ' + error.message, 'error', 5000);
-    } finally {
-        input.value = '';
-    }
-}
-
-function handleAdminDocUpload(input) {
-    const file = input.files[0];
-    if (!file) return;
-    
-    const orderId = currentAdminChatId;
-    if (!orderId) {
-        showToast('Error', 'ID Pesanan tidak ditemukan.', 'error');
-        input.value = '';
-        return;
-    }
-    
-    const orderIndex = orders.findIndex(o => o.id === orderId);
-    if (orderIndex === -1) {
-        showToast('Error', 'Data pesanan tidak ditemukan.', 'error');
-        input.value = '';
-        return;
-    }
-
-    if (file.size <= 500 * 1024) {
-        showToast('Admin', 'Mengkonversi file ke base64...', 'info');
-        try {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const base64 = e.target.result;
-                const newMessage = {
-                    from: 'admin',
-                    text: `📄 File: ${file.name}`,
-                    file: base64,
-                    fileName: file.name,
-                    time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})
-                };
-                
-                if (!orders[orderIndex].chat) orders[orderIndex].chat = [];
-                orders[orderIndex].chat.push(newMessage);
-                
-                localStorage.setItem('joellOrders', JSON.stringify(orders));
-                syncOrdersToCloud();
-                renderAdminChatMessages();
-                showToast('Berhasil', 'File berhasil dikirim (Base64)!', 'success');
-            };
-            reader.readAsDataURL(file);
-        } catch (err) {
-            showToast('Error', 'Gagal memproses file.', 'error');
-        } finally {
-            input.value = '';
-        }
-        return;
-    }
-
-    if (file.size > 20 * 1024 * 1024) {
-        showToast('Error', 'File terlalu besar. Maksimal 20MB.', 'error');
-        input.value = '';
-        return;
-    }
-
-    showToast('Admin', 'Sedang mengupload file...', 'info');
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    try {
-        fetch('https://file.io/?expires=1w&autoDelete=false', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (!response.ok) throw new Error(`Server error: ${response.status}`);
-            return response.json();
-        })
-        .then(result => {
-            if (result.success || result.link) {
-                const fileUrl = result.link || result.url || result.file;
-                if (!fileUrl) throw new Error('URL file tidak ditemukan.');
-                
-                const newMessage = {
-                    from: 'admin',
-                    text: `📄 File: ${file.name}`,
-                    file: fileUrl,
-                    fileName: file.name,
-                    time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})
-                };
-                
-                if (!orders[orderIndex].chat) orders[orderIndex].chat = [];
-                orders[orderIndex].chat.push(newMessage);
-                
-                localStorage.setItem('joellOrders', JSON.stringify(orders));
-                syncOrdersToCloud();
-                renderAdminChatMessages();
-                showToast('Berhasil', 'File berhasil dikirim!', 'success');
-            } else {
-                throw new Error(result.message || 'Gagal mengunggah file.');
-            }
-        })
-        .catch(error => {
-            console.error("File Upload Error:", error);
-            showToast('Error', 'Gagal upload: ' + error.message, 'error', 5000);
-        });
-    } catch (error) {
-        showToast('Error', 'Gagal upload: ' + error.message, 'error', 5000);
-    } finally {
-        input.value = '';
-    }
-}
-
-console.log('✅ JOELL SHOP Script v2.4.1 Loaded Successfully!');
+console.log('✅ JOELL SHOP Script v2.5.0 Loaded Successfully!');
