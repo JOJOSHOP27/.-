@@ -1,5 +1,5 @@
 // ============================================================
-// PAYMENT API - v13.0 (VERCEL COMPATIBLE)
+// PAYMENT API - v15.0 (FINAL - AKURAT DENGAN LZPEDIA)
 // ============================================================
 
 const LZPEDIA_CONFIG = {
@@ -26,14 +26,20 @@ const PAYMENT_API = {
                 const data = await response.json();
                 console.log('📥 [VERCEL] Response:', data);
                 
+                // FORMAT RESPONSE LZPEDIA:
+                // { success: true, invoice_id: "xxx", amount: 50000, fee: 500, total: 50500, qris_image: "https://...", payment_link: "https://...", expired_at: "2025-01-01 12:00:00" }
+                
                 if (data && data.success && data.invoice_id) {
                     console.log('✅ [VERCEL] Invoice created:', data.invoice_id);
+                    console.log('✅ [VERCEL] Total:', data.total);
+                    console.log('✅ [VERCEL] Fee:', data.fee);
+                    
                     return {
                         success: true,
                         invoiceId: data.invoice_id,
                         amount: data.amount || amount,
                         fee: data.fee || 0,
-                        total: data.total || (data.amount + data.fee) || amount,
+                        total: data.total || (data.amount + (data.fee || 0)) || amount,
                         qrisImage: data.qris_image || data.qris || data.qr_code,
                         paymentLink: data.payment_link || data.url,
                         expiredAt: data.expired_at || data.expiry,
@@ -73,7 +79,7 @@ const PAYMENT_API = {
                         invoiceId: data.invoice_id,
                         amount: data.amount || amount,
                         fee: data.fee || 0,
-                        total: data.total || (data.amount + data.fee) || amount,
+                        total: data.total || (data.amount + (data.fee || 0)) || amount,
                         qrisImage: data.qris_image || data.qris || data.qr_code,
                         paymentLink: data.payment_link || data.url,
                         expiredAt: data.expired_at || data.expiry,
@@ -84,46 +90,6 @@ const PAYMENT_API = {
             }
         } catch (e) {
             console.log('❌ [CORS] Error:', e.message);
-        }
-
-        // ===== METHOD 3: ALLORIGINS (fallback) =====
-        try {
-            const allOriginsUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(
-                `${LZPEDIA_CONFIG.baseUrl}/invoice?apikey=${LZPEDIA_CONFIG.apiKey}&amount=${amount}`
-            );
-            console.log('🔗 [ALLORIGINS] Calling...');
-            
-            const response = await fetch(allOriginsUrl, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                cache: 'no-cache'
-            });
-            
-            if (response.ok) {
-                const wrapper = await response.json();
-                let data;
-                try {
-                    data = JSON.parse(wrapper.contents);
-                } catch (e) {}
-                
-                if (data && data.success && data.invoice_id) {
-                    console.log('✅ [ALLORIGINS] Invoice created:', data.invoice_id);
-                    return {
-                        success: true,
-                        invoiceId: data.invoice_id,
-                        amount: data.amount || amount,
-                        fee: data.fee || 0,
-                        total: data.total || (data.amount + data.fee) || amount,
-                        qrisImage: data.qris_image || data.qris || data.qr_code,
-                        paymentLink: data.payment_link || data.url,
-                        expiredAt: data.expired_at || data.expiry,
-                        status: data.status || 'pending',
-                        raw: data
-                    };
-                }
-            }
-        } catch (e) {
-            console.log('❌ [ALLORIGINS] Error:', e.message);
         }
 
         // ===== FALLBACK: MANUAL QRIS =====
@@ -145,7 +111,12 @@ const PAYMENT_API = {
             
             if (response.ok) {
                 const data = await response.json();
-                if (data && data.success) {
+                console.log('📥 [STATUS] Response:', data);
+                
+                // FORMAT RESPONSE STATUS LZPEDIA:
+                // { invoice_id: "xxx", amount: 50000, fee: 500, total: 50500, status: "paid", qris_image: "https://...", payment_link: "https://...", expired_at: "2025-01-01 12:00:00", created_at: "2025-01-01 11:30:00" }
+                
+                if (data && data.invoice_id) {
                     return {
                         success: true,
                         invoiceId: data.invoice_id,
@@ -155,6 +126,8 @@ const PAYMENT_API = {
                         status: data.status || 'pending',
                         qrisImage: data.qris_image || data.qris,
                         paymentLink: data.payment_link,
+                        expiredAt: data.expired_at,
+                        createdAt: data.created_at,
                         raw: data
                     };
                 }
@@ -174,7 +147,7 @@ const PAYMENT_API = {
             
             if (response.ok) {
                 const data = await response.json();
-                if (data && data.success) {
+                if (data && data.invoice_id) {
                     return {
                         success: true,
                         invoiceId: data.invoice_id,
@@ -184,6 +157,8 @@ const PAYMENT_API = {
                         status: data.status || 'pending',
                         qrisImage: data.qris_image || data.qris,
                         paymentLink: data.payment_link,
+                        expiredAt: data.expired_at,
+                        createdAt: data.created_at,
                         raw: data
                     };
                 }
@@ -236,19 +211,21 @@ function setInvoiceHistory(history) {
 }
 
 // ============================================================
-// CREATE INVOICE
+// CREATE INVOICE - PAKAI LZPEDIA
 // ============================================================
 
 window.createInvoice = async function(amount) {
     console.log('🔥 [CREATE] Starting for Rp', amount);
     
     const container = document.getElementById('qrisDisplayContainer');
+    const createBtn = document.getElementById('createInvoiceBtn');
 
     if (!amount || amount <= 0) {
         showToast('Error', 'Jumlah tidak valid', 'error');
         return;
     }
 
+    // TAMPILKAN LOADING
     if (container) {
         container.innerHTML = `
             <div class="qris-loading">
@@ -258,38 +235,57 @@ window.createInvoice = async function(amount) {
             </div>
         `;
     }
+    if (createBtn) {
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Membuat...';
+    }
 
     try {
+        // ===== PANGGIL API LZPEDIA =====
         const result = await PAYMENT_API.createInvoice(amount);
         console.log('📄 [CREATE] Result:', result);
 
+        // ===== CEK APAKAH DARI LZPEDIA ATAU MANUAL =====
         const isLzpedia = result.invoiceId && result.invoiceId.startsWith('INV');
         const isManual = !isLzpedia;
 
         if (isLzpedia) {
             console.log('✅ [CREATE] INVOICE DARI LZPEDIA:', result.invoiceId);
+            console.log('✅ [CREATE] Amount:', result.amount);
+            console.log('✅ [CREATE] Fee:', result.fee);
+            console.log('✅ [CREATE] Total:', result.total);
         } else {
             console.log('⚠️ [CREATE] PAKAI FALLBACK MANUAL');
         }
 
         if (result.success && result.invoiceId) {
+            // ===== SIMPAN CURRENT INVOICE ID =====
             window.currentInvoiceId = result.invoiceId;
 
-            // UPDATE ORDER
+            // ===== UPDATE ORDER DENGAN INVOICE DARI LZPEDIA =====
             const orders = JSON.parse(localStorage.getItem('joellOrders') || '[]');
+            
+            // CARI ORDER YANG BELUM PUNYA INVOICE
             const pendingOrder = orders.find(o => o.status === 'pending' && !o.invoiceId);
             if (pendingOrder) {
+                // PAKAI INVOICE ID DARI LZPEDIA
                 pendingOrder.invoiceId = result.invoiceId;
                 pendingOrder.lzpediaInvoice = result.invoiceId;
                 pendingOrder.paymentStatus = 'pending';
                 pendingOrder.lzpediaTotal = result.total;
                 pendingOrder.lzpediaFee = result.fee;
+                pendingOrder.totalLzpedia = result.total;
+                pendingOrder.lzpediaAmount = result.amount;
+                
                 localStorage.setItem('joellOrders', JSON.stringify(orders));
                 if (typeof syncOrdersToCloud === 'function') syncOrdersToCloud();
-                console.log('✅ [CREATE] Order updated');
+                console.log('✅ [CREATE] Order updated with LZPedia invoice:', result.invoiceId);
+                console.log('✅ [CREATE] Order total updated to:', result.total);
+            } else {
+                console.log('⚠️ [CREATE] No pending order found without invoice');
             }
 
-            // SAVE HISTORY
+            // ===== SIMPAN HISTORY =====
             const history = getInvoiceHistory();
             const existingIndex = history.findIndex(h => h.invoice_id === result.invoiceId);
             if (existingIndex === -1) {
@@ -306,19 +302,25 @@ window.createInvoice = async function(amount) {
                     source: isLzpedia ? 'lzpedia' : 'manual'
                 });
                 setInvoiceHistory(history);
+                console.log('✅ [CREATE] History saved');
             }
 
+            // ===== RENDER ULANG ORDERS =====
             if (typeof renderOrdersList === 'function') renderOrdersList();
+            if (typeof renderInvoiceHistory === 'function') renderInvoiceHistory();
 
+            // ===== TAMPILKAN QRIS =====
             const expiryDate = result.expiredAt ? new Date(result.expiredAt) : new Date(Date.now() + 30 * 60000);
             window.showQrisDisplay(result, expiryDate, isManual);
             window.startPaymentTimer(expiryDate);
             window.startAutoCheckStatus(result.invoiceId);
             
+            // ===== TOAST =====
             const msg = isLzpedia ? '✅ QRIS dari LZPedia siap dibayar' : '⚠️ QRIS Manual (LZPedia offline)';
             showToast('Invoice Dibuat', msg, isLzpedia ? 'success' : 'warning');
 
         } else {
+            // ===== GAGAL =====
             if (container) {
                 container.innerHTML = `
                     <div class="qris-error">
@@ -328,6 +330,9 @@ window.createInvoice = async function(amount) {
                         <button onclick="window.createInvoice(${amount})" class="btn-retry">
                             <i class="fas fa-redo"></i> Coba Lagi
                         </button>
+                        <p style="margin-top:12px;font-size:0.7rem;color:var(--text-muted);">
+                            Pastikan file <strong>api/lzpedia.js</strong> sudah di-deploy.
+                        </p>
                     </div>
                 `;
             }
@@ -348,11 +353,16 @@ window.createInvoice = async function(amount) {
             `;
         }
         showToast('❌ Error', error.message, 'error');
+    } finally {
+        if (createBtn) {
+            createBtn.disabled = false;
+            createBtn.innerHTML = '<i class="fas fa-qrcode"></i> Buat Invoice QRIS';
+        }
     }
 };
 
 // ============================================================
-// SHOW QRIS DISPLAY
+// SHOW QRIS DISPLAY - QRIS DARI LZPEDIA
 // ============================================================
 
 window.showQrisDisplay = function(result, expiryDate, isManual = false) {
@@ -364,8 +374,10 @@ window.showQrisDisplay = function(result, expiryDate, isManual = false) {
         return;
     }
 
+    // ===== QRIS IMAGE - PASTIKAN DARI LZPEDIA =====
     let qrisImage = result.qrisImage || result.qris || result.qr_code || result.qris_url;
     
+    // CEK APAKAH QRIS DARI LZPEDIA
     const isLzpediaQris = qrisImage && (qrisImage.includes('lzpedia') || qrisImage.includes('storage') || qrisImage.includes('app.lzpedia'));
     
     if (isLzpediaQris) {
@@ -384,6 +396,7 @@ window.showQrisDisplay = function(result, expiryDate, isManual = false) {
 
     const timerDisplay = window.formatTimer ? window.formatTimer(expiryDate) : '30:00';
     
+    // ===== INDIKATOR SUMBER QRIS =====
     const sourceIndicator = isLzpediaQris ? 
         `<div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:8px 12px;margin-bottom:12px;text-align:center;font-size:0.7rem;color:var(--green);">
             ✅ QRIS dari LZPedia - Bisa Dibayar
@@ -431,6 +444,7 @@ window.showQrisDisplay = function(result, expiryDate, isManual = false) {
 
             <div class="qris-timer" id="qrisTimerDisplay">${timerDisplay}</div>
 
+            <!-- QRIS IMAGE -->
             <div class="qris-image-box">
                 <img id="qrisCodeImage" 
                      src="${qrisImage}" 
@@ -492,6 +506,7 @@ window.checkInvoiceStatus = async function(invoiceId) {
                 statusEl.textContent = texts[result.status] || 'Menunggu';
             }
 
+            // UPDATE HISTORY
             const history = getInvoiceHistory();
             const item = history.find(h => h.invoice_id === invoiceId);
             if (item) {
@@ -500,6 +515,7 @@ window.checkInvoiceStatus = async function(invoiceId) {
                 if (typeof renderInvoiceHistory === 'function') renderInvoiceHistory();
             }
 
+            // UPDATE ORDER
             if (typeof updateOrderPaymentStatus === 'function') {
                 updateOrderPaymentStatus(invoiceId, result.status);
             }
@@ -715,4 +731,4 @@ window.copyBankInfo = function() {
     }).catch(() => showToast('Error', 'Gagal menyalin', 'error'));
 };
 
-console.log('✅ payment-api.js v13.0 Loaded!');
+console.log('✅ payment-api.js v15.0 Loaded!');
