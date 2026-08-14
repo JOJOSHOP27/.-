@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-// LZPEDIA PROXY - PERMANEN VERSION 1.0
+// LZPEDIA PROXY - JOELL SHOP v2.5
 // ============================================================
 
 header('Content-Type: application/json');
@@ -25,16 +25,31 @@ $invoiceId = isset($_GET['invoice_id']) ? $_GET['invoice_id'] : '';
 // Validasi
 if ($action === 'create') {
     if ($amount <= 0) {
-        sendError('Amount harus lebih dari 0');
+        echo json_encode([
+            'success' => false,
+            'error' => 'Amount harus lebih dari 0',
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+        exit;
     }
     $url = $baseUrl . '/invoice?apikey=' . urlencode($apiKey) . '&amount=' . $amount;
 } elseif ($action === 'status') {
     if (empty($invoiceId)) {
-        sendError('invoice_id wajib diisi');
+        echo json_encode([
+            'success' => false,
+            'error' => 'invoice_id wajib diisi',
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+        exit;
     }
     $url = $baseUrl . '/invoice/status?apikey=' . urlencode($apiKey) . '&invoice_id=' . urlencode($invoiceId);
 } else {
-    sendError('Aksi tidak valid. Gunakan action=create atau action=status');
+    echo json_encode([
+        'success' => false,
+        'error' => 'Aksi tidak valid. Gunakan action=create atau action=status',
+        'timestamp' => date('Y-m-d H:i:s')
+    ]);
+    exit;
 }
 
 // Eksekusi cURL
@@ -57,30 +72,37 @@ curl_close($ch);
 
 // Cek error cURL
 if ($curlError) {
-    sendError('cURL Error: ' . $curlError);
+    echo json_encode([
+        'success' => false,
+        'error' => 'cURL Error: ' . $curlError,
+        'timestamp' => date('Y-m-d H:i:s')
+    ]);
+    exit;
 }
 
 // Cek HTTP status
 if ($httpCode !== 200) {
-    sendError('HTTP Error: ' . $httpCode . ' - ' . $response);
+    echo json_encode([
+        'success' => false,
+        'error' => 'HTTP Error: ' . $httpCode,
+        'response' => substr($response, 0, 200),
+        'timestamp' => date('Y-m-d H:i:s')
+    ]);
+    exit;
 }
 
 // Parse JSON
 $data = json_decode($response, true);
 if (json_last_error() !== JSON_ERROR_NONE) {
-    sendError('Invalid JSON response: ' . substr($response, 0, 200));
+    echo json_encode([
+        'success' => false,
+        'error' => 'Invalid JSON response: ' . substr($response, 0, 200),
+        'timestamp' => date('Y-m-d H:i:s')
+    ]);
+    exit;
 }
 
 // Kirim respons
 echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 exit;
-
-function sendError($message) {
-    echo json_encode([
-        'success' => false,
-        'error' => $message,
-        'timestamp' => date('Y-m-d H:i:s')
-    ], JSON_PRETTY_PRINT);
-    exit;
-}
 ?>
