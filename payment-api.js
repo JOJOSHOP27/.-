@@ -1,7 +1,14 @@
+// ============================================================
+// PAYMENT API - v5.0 (Dengan Proxy PHP Permanen)
+// ============================================================
+
 const PAYMENT_API = {
+    // Gunakan proxy PHP kita sebagai prioritas utama
+    proxyUrl: window.location.origin + '/lzpedia-proxy.php',
     apiKey: 'LXZ_015d8a759df64d48',
     baseUrl: 'https://app.lzpedia.my.id/api',
-    backendUrl: window.location.origin + '/api/lzpedia',
+    
+    // Fallback ke metode lama jika proxy gagal
     corsProxies: [
         'https://api.allorigins.win/get?url=',
         'https://corsproxy.io/?',
@@ -10,34 +17,97 @@ const PAYMENT_API = {
 
     async createInvoice(amount) {
         try {
-            let result;
-            console.log('📤 [METHOD 1] Direct CORS fetch...');
-            result = await this._tryDirectFetch(`${this.baseUrl}/invoice?apikey=${this.apiKey}&amount=${amount}`);
+            // METHOD 1: Proxy PHP (paling stabil)
+            console.log('📤 [METHOD 1] Proxy PHP...');
+            const result = await this._tryProxy('create', amount);
             if (result && result.success) return result;
 
-            console.log('📤 [METHOD 2] CORS Proxy...');
+            // METHOD 2: Direct CORS
+            console.log('📤 [METHOD 2] Direct fetch...');
+            const direct = await this._tryDirectFetch(`${this.baseUrl}/invoice?apikey=${this.apiKey}&amount=${amount}`);
+            if (direct && direct.success) return direct;
+
+            // METHOD 3: CORS Proxies
+            console.log('📤 [METHOD 3] CORS Proxy...');
             for (let proxy of this.corsProxies) {
-                result = await this._tryCorsProxy(proxy, `${this.baseUrl}/invoice?apikey=${this.apiKey}&amount=${amount}`);
-                if (result && result.success) return result;
+                const res = await this._tryCorsProxy(proxy, `${this.baseUrl}/invoice?apikey=${this.apiKey}&amount=${amount}`);
+                if (res && res.success) return res;
             }
 
-            console.log('📤 [METHOD 3] JSONP...');
-            result = await this._tryJsonp(`${this.baseUrl}/invoice?apikey=${this.apiKey}&amount=${amount}`);
-            if (result && result.success) return result;
+            // METHOD 4: JSONP
+            console.log('📤 [METHOD 4] JSONP...');
+            const jsonp = await this._tryJsonp(`${this.baseUrl}/invoice?apikey=${this.apiKey}&amount=${amount}`);
+            if (jsonp && jsonp.success) return jsonp;
 
             return {
                 success: false,
-                error: 'Gagal terhubung ke server pembayaran. Semua metode gagal.',
-                debug: {
-                    message: 'CORS diblokir. Solusi: deploy api/lzpedia.js di Vercel atau hubungi admin.',
-                    url: `${this.baseUrl}/invoice?apikey=***&amount=${amount}`
-                }
+                error: 'Semua metode gagal. Pastikan server proxy aktif.',
+                debug: 'Gunakan lzpedia-proxy.php di root folder'
             };
         } catch (error) {
             return { success: false, error: error.message };
         }
     },
 
+    async checkInvoiceStatus(invoiceId) {
+        try {
+            // METHOD 1: Proxy PHP
+            console.log('📤 [STATUS] Proxy PHP...');
+            const result = await this._tryProxy('status', null, invoiceId);
+            if (result && result.success) return result;
+
+            // METHOD 2: Direct
+            const url = `${this.baseUrl}/invoice/status?apikey=${this.apiKey}&invoice_id=${invoiceId}`;
+            const direct = await this._tryDirectFetch(url);
+            if (direct && direct.success) return direct;
+
+            // METHOD 3: CORS Proxies
+            for (let proxy of this.corsProxies) {
+                const res = await this._tryCorsProxy(proxy, url);
+                if (res && res.success) return res;
+            }
+
+            // METHOD 4: JSONP
+            const jsonp = await this._tryJsonp(url);
+            if (jsonp && jsonp.success) return jsonp;
+
+            return { success: false, error: 'Gagal mengecek status' };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    // ===== PROXY PHP =====
+    async _tryProxy(action, amount = 0, invoiceId = '') {
+        try {
+            let url = this.proxyUrl + '?action=' + action;
+            if (action === 'create') url += '&amount=' + amount;
+            if (action === 'status') url += '&invoice_id=' + encodeURIComponent(invoiceId);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-cache'
+            });
+
+            if (!response.ok) {
+                console.warn('Proxy response error:', response.status);
+                return null;
+            }
+
+            const data = await response.json();
+            if (data.success && (data.invoice_id || data.status)) {
+                if (action === 'create') return this._formatResponse(data);
+                if (action === 'status') return this._formatStatusResponse(data);
+            }
+            return null;
+        } catch (e) {
+            console.warn('Proxy error:', e.message);
+            return null;
+        }
+    },
+
+    // ===== DIRECT FETCH =====
     async _tryDirectFetch(url) {
         try {
             const response = await fetch(url, {
@@ -49,10 +119,12 @@ const PAYMENT_API = {
             const text = await response.text();
             const data = JSON.parse(text);
             if (data.success && data.invoice_id) return this._formatResponse(data);
+            if (data.success && data.status) return this._formatStatusResponse(data);
             return null;
         } catch (e) { return null; }
     },
 
+    // ===== CORS PROXY =====
     async _tryCorsProxy(proxy, url) {
         try {
             const proxyUrl = proxy + encodeURIComponent(url);
@@ -64,10 +136,12 @@ const PAYMENT_API = {
                 data = parsed.contents ? JSON.parse(parsed.contents) : parsed;
             } catch (e) { data = JSON.parse(text); }
             if (data.success && data.invoice_id) return this._formatResponse(data);
+            if (data.success && data.status) return this._formatStatusResponse(data);
             return null;
         } catch (e) { return null; }
     },
 
+    // ===== JSONP =====
     _tryJsonp(url) {
         return new Promise((resolve) => {
             const script = document.createElement('script');
@@ -77,32 +151,17 @@ const PAYMENT_API = {
                 resolved = true;
                 delete window[cbName];
                 if (script.parentNode) document.head.removeChild(script);
-                if (data && data.success && data.invoice_id) resolve(PAYMENT_API._formatResponse(data));
-                else resolve(null);
+                if (data && data.success && (data.invoice_id || data.status)) {
+                    if (data.invoice_id) resolve(PAYMENT_API._formatResponse(data));
+                    else if (data.status) resolve(PAYMENT_API._formatStatusResponse(data));
+                    else resolve(null);
+                } else resolve(null);
             };
             script.src = url + '&callback=' + cbName;
             script.onerror = () => { if (!resolved) { resolved = true; delete window[cbName]; if (script.parentNode) document.head.removeChild(script); resolve(null); } };
             document.head.appendChild(script);
             setTimeout(() => { if (!resolved) { resolved = true; delete window[cbName]; if (script.parentNode) document.head.removeChild(script); resolve(null); } }, 8000);
         });
-    },
-
-    async checkInvoiceStatus(invoiceId) {
-        try {
-            let result;
-            const url = `${this.baseUrl}/invoice/status?apikey=${this.apiKey}&invoice_id=${invoiceId}`;
-            result = await this._tryDirectFetch(url);
-            if (result && result.success) return result;
-            for (let proxy of this.corsProxies) {
-                result = await this._tryCorsProxy(proxy, url);
-                if (result && result.success) return result;
-            }
-            result = await this._tryJsonp(url);
-            if (result && result.success) return result;
-            return { success: false, error: 'Gagal mengecek status' };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
     },
 
     _formatResponse(data) {
@@ -137,6 +196,9 @@ const PAYMENT_API = {
     }
 };
 
+// ============================================================
+// GLOBAL STATE & FUNCTIONS
+// ============================================================
 window.currentInvoiceId = null;
 window.timerInterval = null;
 window.autoCheckInterval = null;
@@ -149,7 +211,7 @@ function setInvoiceHistory(history) {
 }
 
 // ============================================================
-// BUAT INVOICE - TAMPILAN BARU SEPERTI LZPEDIA
+// CREATE INVOICE
 // ============================================================
 window.createInvoice = async function(amount) {
     const container = document.getElementById('qrisDisplayContainer');
@@ -160,7 +222,6 @@ window.createInvoice = async function(amount) {
         return;
     }
 
-    // LOADING
     if (container) {
         container.innerHTML = `
             <div class="qris-loading">
@@ -176,12 +237,11 @@ window.createInvoice = async function(amount) {
 
     try {
         const result = await PAYMENT_API.createInvoice(amount);
-        console.log('📄 Result:', result);
+        console.log('📄 Invoice Result:', result);
 
         if (result.success && result.invoiceId) {
             window.currentInvoiceId = result.invoiceId;
 
-            // Parse expiry
             let expiryDate;
             if (result.expiredAt) {
                 expiryDate = new Date(result.expiredAt.replace(' ', 'T'));
@@ -189,7 +249,6 @@ window.createInvoice = async function(amount) {
                 expiryDate = new Date(Date.now() + 30 * 60000);
             }
 
-            // Simpan ke history
             const invoiceData = {
                 invoice_id: result.invoiceId,
                 total: result.total,
@@ -206,17 +265,13 @@ window.createInvoice = async function(amount) {
             setInvoiceHistory(history);
             window.renderInvoiceHistory();
 
-            // TAMPILKAN QRIS SEPERTI LZPEDIA
             window.showQrisDisplay(result, expiryDate);
-
-            // Start timer & auto check
             window.startPaymentTimer(expiryDate);
             window.startAutoCheckStatus(result.invoiceId);
 
             showToast('✅ Invoice Dibuat', 'Scan QRIS untuk bayar', 'success');
 
         } else {
-            // ERROR
             if (container) {
                 container.innerHTML = `
                     <div class="qris-error">
@@ -226,6 +281,9 @@ window.createInvoice = async function(amount) {
                         <button onclick="window.createInvoice(${amount})" class="btn-retry">
                             <i class="fas fa-redo"></i> Coba Lagi
                         </button>
+                        <p style="margin-top:10px;font-size:0.7rem;color:var(--text-muted);">
+                            Pastikan file <strong>lzpedia-proxy.php</strong> ada di root folder.
+                        </p>
                     </div>
                 `;
             }
@@ -253,14 +311,14 @@ window.createInvoice = async function(amount) {
 };
 
 // ============================================================
-// TAMPILAN QRIS BARU (MIrip LZPedia)
+// SHOW QRIS DISPLAY
 // ============================================================
 window.showQrisDisplay = function(result, expiryDate) {
     const container = document.getElementById('qrisDisplayContainer');
     if (!container) return;
 
     const statusColor = result.status === 'pending' ? '#fbbf24' : (result.status === 'paid' ? '#10b981' : '#ef4444');
-    const statusText = result.status === 'pending' ? 'Menunggu Pembayaran' : (result.status === 'paid' ? 'Lunas' : 'Kadaluarsa');
+    const statusText = result.status === 'pending' ? 'Menunggu Pembayaran' : (result.status === 'paid' ? 'Lunas ✅' : 'Kadaluarsa ❌');
 
     container.innerHTML = `
         <div class="lzpedia-style-invoice">
@@ -301,7 +359,7 @@ window.showQrisDisplay = function(result, expiryDate) {
                 ` : ''}
             </div>
 
-            <div class="qris-timer" id="qrisTimerDisplay">30:00</div>
+            <div class="qris-timer" id="qrisTimerDisplay">${window.formatTimer(expiryDate)}</div>
 
             <div class="qris-image-box">
                 <img id="qrisCodeImage" src="${result.qrisImage}" alt="QRIS Code" 
@@ -328,6 +386,14 @@ window.showQrisDisplay = function(result, expiryDate) {
     `;
 };
 
+window.formatTimer = function(expiryDate) {
+    const diff = expiryDate - new Date();
+    if (diff <= 0) return '00:00';
+    const m = Math.floor(diff / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+};
+
 window.downloadQris = function(url) {
     const a = document.createElement('a');
     a.href = url;
@@ -340,7 +406,7 @@ window.downloadQris = function(url) {
 };
 
 // ============================================================
-// CEK STATUS
+// CEK STATUS PEMBAYARAN
 // ============================================================
 window.checkInvoiceStatus = async function(invoiceId) {
     if (!invoiceId) { showToast('Error', 'Tidak ada invoice', 'error'); return; }
@@ -354,27 +420,36 @@ window.checkInvoiceStatus = async function(invoiceId) {
             const statusEl = document.querySelector('.status-value');
             if (statusEl) {
                 const colors = { 'pending': '#fbbf24', 'paid': '#10b981', 'expired': '#ef4444' };
-                const texts = { 'pending': 'Menunggu Pembayaran', 'paid': 'Lunas', 'expired': 'Kadaluarsa' };
+                const texts = { 'pending': 'Menunggu Pembayaran', 'paid': 'Lunas ✅', 'expired': 'Kadaluarsa ❌' };
                 statusEl.style.color = colors[result.status] || '#fbbf24';
                 statusEl.textContent = texts[result.status] || 'Menunggu';
             }
 
             let history = getInvoiceHistory();
             const item = history.find(i => i.invoice_id === invoiceId);
-            if (item) { item.status = result.status; setInvoiceHistory(history); window.renderInvoiceHistory(); }
+            if (item) { 
+                item.status = result.status; 
+                setInvoiceHistory(history); 
+                window.renderInvoiceHistory(); 
+            }
 
             if (result.status === 'paid') {
-                showToast('✅ Berhasil!', 'Pembayaran lunas', 'success', 5000);
+                showToast('✅ Pembayaran Lunas!', 'Pesanan Anda akan segera diproses', 'success', 5000);
+                updateOrderPaymentStatus(invoiceId, 'paid');
                 if (window.autoCheckInterval) { clearInterval(window.autoCheckInterval); window.autoCheckInterval = null; }
-                setTimeout(() => { const overlay = document.getElementById('paymentOverlay'); if (overlay) overlay.classList.remove('open'); }, 3000);
+                setTimeout(() => { 
+                    const overlay = document.getElementById('paymentOverlay'); 
+                    if (overlay) overlay.classList.remove('open'); 
+                }, 3000);
             } else if (result.status === 'expired') {
                 showToast('⏰ Kadaluarsa', 'Buat invoice baru', 'warning');
+                updateOrderPaymentStatus(invoiceId, 'expired');
                 if (window.autoCheckInterval) { clearInterval(window.autoCheckInterval); window.autoCheckInterval = null; }
             } else {
-                showToast('⏳ Menunggu', 'Belum dibayar', 'info');
+                showToast('⏳ Menunggu Pembayaran', 'Belum dibayar', 'info');
             }
         } else {
-            showToast('Error', result.error || 'Gagal', 'error');
+            showToast('Error', result.error || 'Gagal cek status', 'error');
         }
     } catch (error) {
         showToast('Error', error.message, 'error');
@@ -382,6 +457,37 @@ window.checkInvoiceStatus = async function(invoiceId) {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Cek Status'; }
     }
 };
+
+// ============================================================
+// UPDATE ORDER PAYMENT STATUS (dipanggil dari script.js)
+// ============================================================
+function updateOrderPaymentStatus(invoiceId, status) {
+    if (typeof orders === 'undefined' || !orders || !Array.isArray(orders)) return;
+    
+    const order = orders.find(o => o.invoiceId === invoiceId || o.id === invoiceId);
+    if (order) {
+        if (status === 'paid') {
+            order.status = 'processing';
+            order.statusLabel = 'Diproses';
+            order.paymentStatus = 'paid';
+            if (order.timeline && order.timeline[0]) {
+                order.timeline[0].completed = true;
+                order.timeline[0].time = new Date().toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit'});
+            }
+        } else if (status === 'expired') {
+            order.status = 'pending';
+            order.statusLabel = 'Kadaluarsa';
+            order.paymentStatus = 'expired';
+        }
+        localStorage.setItem('joellOrders', JSON.stringify(orders));
+        if (typeof syncOrdersToCloud === 'function') syncOrdersToCloud();
+        if (typeof renderOrdersList === 'function') renderOrdersList();
+        if (typeof isAdminLoggedIn !== 'undefined' && isAdminLoggedIn) {
+            if (typeof renderAdminOrders === 'function') renderAdminOrders();
+            if (typeof updateAdminStats === 'function') updateAdminStats();
+        }
+    }
+}
 
 // ============================================================
 // TIMER
@@ -397,16 +503,19 @@ window.startPaymentTimer = function(expiryDate) {
             window.timerInterval = null;
             if (displayEl) displayEl.textContent = '00:00';
             const statusEl = document.querySelector('.status-value');
-            if (statusEl) { statusEl.textContent = 'Kadaluarsa'; statusEl.style.color = '#ef4444'; }
+            if (statusEl) { statusEl.textContent = 'Kadaluarsa ❌'; statusEl.style.color = '#ef4444'; }
             if (window.autoCheckInterval) { clearInterval(window.autoCheckInterval); window.autoCheckInterval = null; }
             let history = getInvoiceHistory();
             const item = history.find(i => i.invoice_id === window.currentInvoiceId);
             if (item) { item.status = 'expired'; setInvoiceHistory(history); window.renderInvoiceHistory(); }
+            updateOrderPaymentStatus(window.currentInvoiceId, 'expired');
             return;
         }
-        const m = Math.floor(diff / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-        if (displayEl) displayEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        if (displayEl) {
+            const m = Math.floor(diff / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            displayEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        }
     }, 1000);
 };
 
@@ -415,7 +524,7 @@ window.startAutoCheckStatus = function(invoiceId) {
     window.autoCheckInterval = setInterval(() => {
         if (window.currentInvoiceId) window.checkInvoiceStatus(window.currentInvoiceId);
         else { clearInterval(window.autoCheckInterval); window.autoCheckInterval = null; }
-    }, 10000);
+    }, 15000);
 };
 
 // ============================================================
@@ -483,7 +592,7 @@ window.openInvoiceDetail = function(invoiceId) {
 };
 
 // ============================================================
-// OPEN PAYMENT MODAL
+// OPEN PAYMENT MODAL - QRIS AUTO GENERATE
 // ============================================================
 window.openPaymentModal = function(orderData) {
     const overlay = document.getElementById('paymentOverlay');
@@ -494,9 +603,11 @@ window.openPaymentModal = function(orderData) {
     const qrisContainer = document.getElementById('qrisDisplayContainer');
 
     let total = 0;
+    let orderId = null;
     if (orderData && orderData.items) {
         if (itemsContainer) itemsContainer.innerHTML = orderData.items.map(i => `<div class="order-item-line">${i.name} (${i.variant}) x${i.qty} = Rp ${(i.price*i.qty).toLocaleString('id-ID')}</div>`).join('');
         total = orderData.total || orderData.items.reduce((s,i)=>s+i.price*i.qty,0);
+        orderId = orderData.id;
     } else {
         const cart = JSON.parse(localStorage.getItem('joellCart')) || [];
         if (itemsContainer) itemsContainer.innerHTML = cart.map(i => `<div class="order-item-line">${i.name} (${i.variant}) x${i.qty} = Rp ${(i.price*i.qty).toLocaleString('id-ID')}</div>`).join('');
@@ -504,22 +615,29 @@ window.openPaymentModal = function(orderData) {
     }
     if (totalEl) totalEl.textContent = 'Total: Rp ' + total.toLocaleString('id-ID');
 
-    // Reset tampilan QRIS
-    if (qrisContainer) {
+    if (qrisContainer && total > 0) {
         qrisContainer.innerHTML = `
-            <div class="qris-placeholder">
-                <i class="fas fa-qrcode"></i>
-                <p>Klik tombol di bawah untuk generate QRIS</p>
+            <div class="qris-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Membuat QRIS...</p>
             </div>
         `;
+        
+        setTimeout(() => {
+            window.createInvoice(total);
+            if (orderId) {
+                const order = window.orders ? window.orders.find(o => o.id === orderId) : null;
+                if (order) {
+                    order.invoiceId = window.currentInvoiceId;
+                    localStorage.setItem('joellOrders', JSON.stringify(window.orders || []));
+                    if (typeof syncOrdersToCloud === 'function') syncOrdersToCloud();
+                }
+            }
+        }, 300);
     }
 
     const btnCreate = document.getElementById('createInvoiceBtn');
-    if (btnCreate) {
-        btnCreate.style.display = 'inline-flex';
-        btnCreate.disabled = false;
-        btnCreate.innerHTML = '<i class="fas fa-qrcode"></i> Buat Invoice QRIS';
-    }
+    if (btnCreate) btnCreate.style.display = 'none';
 
     if (window.timerInterval) clearInterval(window.timerInterval);
     if (window.autoCheckInterval) { clearInterval(window.autoCheckInterval); window.autoCheckInterval = null; }
@@ -535,8 +653,11 @@ window.copyBankInfo = function() {
     }).catch(() => showToast('Error', 'Gagal menyalin', 'error'));
 };
 
+// ============================================================
+// DOM READY
+// ============================================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔧 Payment System v4.0 Loaded');
+    console.log('🔧 Payment System v5.0 Loaded');
 
     const createBtn = document.getElementById('createInvoiceBtn');
     if (createBtn) {
@@ -581,4 +702,4 @@ document.addEventListener('DOMContentLoaded', function() {
     window.renderInvoiceHistory();
 });
 
-console.log('✅ payment-api.js v4.0 Loaded!');
+console.log('✅ payment-api.js v5.0 Loaded!');
