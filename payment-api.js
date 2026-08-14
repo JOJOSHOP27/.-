@@ -1,5 +1,5 @@
 // ============================================================
-// PAYMENT API - v12.0 (FULLY WORKING WITH LZPEDIA)
+// PAYMENT API - v13.0 (VERCEL COMPATIBLE)
 // ============================================================
 
 const LZPEDIA_CONFIG = {
@@ -11,10 +11,12 @@ const PAYMENT_API = {
     async createInvoice(amount) {
         console.log('📤 [LZPEDIA] Creating invoice for Rp', amount);
         
-        // ===== PROXY PHP =====
+        // ===== METHOD 1: VERCEL SERVERLESS =====
         try {
-            const proxyUrl = '/lzpedia-proxy.php?action=create&amount=' + amount;
-            const response = await fetch(proxyUrl, {
+            const vercelUrl = '/api/lzpedia?action=create&amount=' + amount;
+            console.log('🔗 [VERCEL] Calling:', vercelUrl);
+            
+            const response = await fetch(vercelUrl, {
                 method: 'GET',
                 headers: { 'Accept': 'application/json' },
                 cache: 'no-cache'
@@ -22,10 +24,10 @@ const PAYMENT_API = {
             
             if (response.ok) {
                 const data = await response.json();
-                console.log('📥 [LZPEDIA] Response:', data);
+                console.log('📥 [VERCEL] Response:', data);
                 
                 if (data && data.success && data.invoice_id) {
-                    console.log('✅ [LZPEDIA] Invoice created:', data.invoice_id);
+                    console.log('✅ [VERCEL] Invoice created:', data.invoice_id);
                     return {
                         success: true,
                         invoiceId: data.invoice_id,
@@ -41,12 +43,129 @@ const PAYMENT_API = {
                 }
             }
         } catch (e) {
-            console.log('❌ [LZPEDIA] Proxy error:', e.message);
+            console.log('❌ [VERCEL] Error:', e.message);
         }
 
-        // ===== DIRECT API =====
+        // ===== METHOD 2: CORS PROXY (fallback) =====
         try {
-            const directUrl = `${LZPEDIA_CONFIG.baseUrl}/invoice?apikey=${LZPEDIA_CONFIG.apiKey}&amount=${amount}`;
+            const corsUrl = 'https://corsproxy.io/?' + encodeURIComponent(
+                `${LZPEDIA_CONFIG.baseUrl}/invoice?apikey=${LZPEDIA_CONFIG.apiKey}&amount=${amount}`
+            );
+            console.log('🔗 [CORS] Calling proxy...');
+            
+            const response = await fetch(corsUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-cache'
+            });
+            
+            if (response.ok) {
+                let data = await response.text();
+                try {
+                    data = JSON.parse(data);
+                    if (data.contents) data = JSON.parse(data.contents);
+                } catch (e) {}
+                
+                if (data && data.success && data.invoice_id) {
+                    console.log('✅ [CORS] Invoice created:', data.invoice_id);
+                    return {
+                        success: true,
+                        invoiceId: data.invoice_id,
+                        amount: data.amount || amount,
+                        fee: data.fee || 0,
+                        total: data.total || (data.amount + data.fee) || amount,
+                        qrisImage: data.qris_image || data.qris || data.qr_code,
+                        paymentLink: data.payment_link || data.url,
+                        expiredAt: data.expired_at || data.expiry,
+                        status: data.status || 'pending',
+                        raw: data
+                    };
+                }
+            }
+        } catch (e) {
+            console.log('❌ [CORS] Error:', e.message);
+        }
+
+        // ===== METHOD 3: ALLORIGINS (fallback) =====
+        try {
+            const allOriginsUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(
+                `${LZPEDIA_CONFIG.baseUrl}/invoice?apikey=${LZPEDIA_CONFIG.apiKey}&amount=${amount}`
+            );
+            console.log('🔗 [ALLORIGINS] Calling...');
+            
+            const response = await fetch(allOriginsUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-cache'
+            });
+            
+            if (response.ok) {
+                const wrapper = await response.json();
+                let data;
+                try {
+                    data = JSON.parse(wrapper.contents);
+                } catch (e) {}
+                
+                if (data && data.success && data.invoice_id) {
+                    console.log('✅ [ALLORIGINS] Invoice created:', data.invoice_id);
+                    return {
+                        success: true,
+                        invoiceId: data.invoice_id,
+                        amount: data.amount || amount,
+                        fee: data.fee || 0,
+                        total: data.total || (data.amount + data.fee) || amount,
+                        qrisImage: data.qris_image || data.qris || data.qr_code,
+                        paymentLink: data.payment_link || data.url,
+                        expiredAt: data.expired_at || data.expiry,
+                        status: data.status || 'pending',
+                        raw: data
+                    };
+                }
+            }
+        } catch (e) {
+            console.log('❌ [ALLORIGINS] Error:', e.message);
+        }
+
+        // ===== FALLBACK: MANUAL QRIS =====
+        console.log('⚠️ [FALLBACK] All methods failed, using manual QRIS');
+        return this._manualFallback(amount);
+    },
+
+    async checkInvoiceStatus(invoiceId) {
+        console.log('📤 [STATUS] Checking:', invoiceId);
+        
+        // ===== METHOD 1: VERCEL =====
+        try {
+            const vercelUrl = '/api/lzpedia?action=status&invoice_id=' + encodeURIComponent(invoiceId);
+            const response = await fetch(vercelUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-cache'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.success) {
+                    return {
+                        success: true,
+                        invoiceId: data.invoice_id,
+                        amount: data.amount || 0,
+                        fee: data.fee || 0,
+                        total: data.total || 0,
+                        status: data.status || 'pending',
+                        qrisImage: data.qris_image || data.qris,
+                        paymentLink: data.payment_link,
+                        raw: data
+                    };
+                }
+            }
+        } catch (e) {
+            console.log('❌ [STATUS] Vercel error:', e.message);
+        }
+
+        // ===== METHOD 2: DIRECT =====
+        try {
+            const directUrl = `${LZPEDIA_CONFIG.baseUrl}/invoice/status?apikey=${LZPEDIA_CONFIG.apiKey}&invoice_id=${encodeURIComponent(invoiceId)}`;
             const response = await fetch(directUrl, {
                 method: 'GET',
                 headers: { 'Accept': 'application/json' },
@@ -55,89 +174,25 @@ const PAYMENT_API = {
             
             if (response.ok) {
                 const data = await response.json();
-                if (data && data.success && data.invoice_id) {
-                    console.log('✅ [LZPEDIA] Direct success:', data.invoice_id);
+                if (data && data.success) {
                     return {
                         success: true,
                         invoiceId: data.invoice_id,
-                        amount: data.amount || amount,
+                        amount: data.amount || 0,
                         fee: data.fee || 0,
-                        total: data.total || (data.amount + data.fee) || amount,
-                        qrisImage: data.qris_image || data.qris || data.qr_code,
-                        paymentLink: data.payment_link || data.url,
-                        expiredAt: data.expired_at || data.expiry,
+                        total: data.total || 0,
                         status: data.status || 'pending',
+                        qrisImage: data.qris_image || data.qris,
+                        paymentLink: data.payment_link,
                         raw: data
                     };
                 }
             }
         } catch (e) {
-            console.log('❌ [LZPEDIA] Direct error:', e.message);
+            console.log('❌ [STATUS] Direct error:', e.message);
         }
 
-        // ===== FALLBACK =====
-        console.log('⚠️ [LZPEDIA] All methods failed, using fallback');
-        return this._manualFallback(amount);
-    },
-
-    async checkInvoiceStatus(invoiceId) {
-        console.log('📤 [LZPEDIA] Checking status:', invoiceId);
-        
-        try {
-            // PROXY
-            const proxyUrl = '/lzpedia-proxy.php?action=status&invoice_id=' + encodeURIComponent(invoiceId);
-            const response = await fetch(proxyUrl, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                cache: 'no-cache'
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.success) {
-                    return {
-                        success: true,
-                        invoiceId: data.invoice_id,
-                        amount: data.amount || 0,
-                        fee: data.fee || 0,
-                        total: data.total || 0,
-                        status: data.status || 'pending',
-                        qrisImage: data.qris_image || data.qris,
-                        paymentLink: data.payment_link,
-                        raw: data
-                    };
-                }
-            }
-            
-            // DIRECT
-            const directUrl = `${LZPEDIA_CONFIG.baseUrl}/invoice/status?apikey=${LZPEDIA_CONFIG.apiKey}&invoice_id=${encodeURIComponent(invoiceId)}`;
-            const directResponse = await fetch(directUrl, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                cache: 'no-cache'
-            });
-            
-            if (directResponse.ok) {
-                const data = await directResponse.json();
-                if (data && data.success) {
-                    return {
-                        success: true,
-                        invoiceId: data.invoice_id,
-                        amount: data.amount || 0,
-                        fee: data.fee || 0,
-                        total: data.total || 0,
-                        status: data.status || 'pending',
-                        qrisImage: data.qris_image || data.qris,
-                        paymentLink: data.payment_link,
-                        raw: data
-                    };
-                }
-            }
-            
-            return { success: false, error: 'Gagal cek status' };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
+        return { success: false, error: 'Gagal cek status' };
     },
 
     _manualFallback(amount) {
@@ -181,21 +236,19 @@ function setInvoiceHistory(history) {
 }
 
 // ============================================================
-// CREATE INVOICE - PAKAI LZPEDIA
+// CREATE INVOICE
 // ============================================================
 
 window.createInvoice = async function(amount) {
     console.log('🔥 [CREATE] Starting for Rp', amount);
     
     const container = document.getElementById('qrisDisplayContainer');
-    const createBtn = document.getElementById('createInvoiceBtn');
 
     if (!amount || amount <= 0) {
         showToast('Error', 'Jumlah tidak valid', 'error');
         return;
     }
 
-    // TAMPILKAN LOADING
     if (container) {
         container.innerHTML = `
             <div class="qris-loading">
@@ -207,11 +260,9 @@ window.createInvoice = async function(amount) {
     }
 
     try {
-        // ===== PANGGIL API LZPEDIA =====
         const result = await PAYMENT_API.createInvoice(amount);
         console.log('📄 [CREATE] Result:', result);
 
-        // ===== CEK APAKAH DARI LZPEDIA ATAU MANUAL =====
         const isLzpedia = result.invoiceId && result.invoiceId.startsWith('INV');
         const isManual = !isLzpedia;
 
@@ -222,13 +273,10 @@ window.createInvoice = async function(amount) {
         }
 
         if (result.success && result.invoiceId) {
-            // ===== SIMPAN CURRENT INVOICE ID =====
             window.currentInvoiceId = result.invoiceId;
 
-            // ===== UPDATE ORDER DENGAN INVOICE DARI LZPEDIA =====
+            // UPDATE ORDER
             const orders = JSON.parse(localStorage.getItem('joellOrders') || '[]');
-            
-            // CARI ORDER YANG BELUM PUNYA INVOICE
             const pendingOrder = orders.find(o => o.status === 'pending' && !o.invoiceId);
             if (pendingOrder) {
                 pendingOrder.invoiceId = result.invoiceId;
@@ -236,13 +284,12 @@ window.createInvoice = async function(amount) {
                 pendingOrder.paymentStatus = 'pending';
                 pendingOrder.lzpediaTotal = result.total;
                 pendingOrder.lzpediaFee = result.fee;
-                
                 localStorage.setItem('joellOrders', JSON.stringify(orders));
                 if (typeof syncOrdersToCloud === 'function') syncOrdersToCloud();
-                console.log('✅ [CREATE] Order updated with LZPedia invoice:', result.invoiceId);
+                console.log('✅ [CREATE] Order updated');
             }
 
-            // ===== SIMPAN HISTORY =====
+            // SAVE HISTORY
             const history = getInvoiceHistory();
             const existingIndex = history.findIndex(h => h.invoice_id === result.invoiceId);
             if (existingIndex === -1) {
@@ -259,24 +306,19 @@ window.createInvoice = async function(amount) {
                     source: isLzpedia ? 'lzpedia' : 'manual'
                 });
                 setInvoiceHistory(history);
-                console.log('✅ [CREATE] History saved');
             }
 
-            // ===== RENDER ULANG ORDERS =====
             if (typeof renderOrdersList === 'function') renderOrdersList();
 
-            // ===== TAMPILKAN QRIS =====
             const expiryDate = result.expiredAt ? new Date(result.expiredAt) : new Date(Date.now() + 30 * 60000);
-            window.showQrisDisplay(result, expiryDate, !isLzpedia);
+            window.showQrisDisplay(result, expiryDate, isManual);
             window.startPaymentTimer(expiryDate);
             window.startAutoCheckStatus(result.invoiceId);
             
-            // ===== TOAST =====
             const msg = isLzpedia ? '✅ QRIS dari LZPedia siap dibayar' : '⚠️ QRIS Manual (LZPedia offline)';
             showToast('Invoice Dibuat', msg, isLzpedia ? 'success' : 'warning');
 
         } else {
-            // ===== GAGAL =====
             if (container) {
                 container.innerHTML = `
                     <div class="qris-error">
@@ -286,9 +328,6 @@ window.createInvoice = async function(amount) {
                         <button onclick="window.createInvoice(${amount})" class="btn-retry">
                             <i class="fas fa-redo"></i> Coba Lagi
                         </button>
-                        <p style="margin-top:12px;font-size:0.7rem;color:var(--text-muted);">
-                            Pastikan file <strong>lzpedia-proxy.php</strong> ada di root folder.
-                        </p>
                     </div>
                 `;
             }
@@ -313,7 +352,7 @@ window.createInvoice = async function(amount) {
 };
 
 // ============================================================
-// SHOW QRIS DISPLAY - QRIS DARI LZPEDIA
+// SHOW QRIS DISPLAY
 // ============================================================
 
 window.showQrisDisplay = function(result, expiryDate, isManual = false) {
@@ -325,11 +364,9 @@ window.showQrisDisplay = function(result, expiryDate, isManual = false) {
         return;
     }
 
-    // ===== QRIS IMAGE - PASTIKAN DARI LZPEDIA =====
     let qrisImage = result.qrisImage || result.qris || result.qr_code || result.qris_url;
     
-    // CEK APAKAH QRIS DARI LZPEDIA
-    const isLzpediaQris = qrisImage && (qrisImage.includes('lzpedia') || qrisImage.includes('storage'));
+    const isLzpediaQris = qrisImage && (qrisImage.includes('lzpedia') || qrisImage.includes('storage') || qrisImage.includes('app.lzpedia'));
     
     if (isLzpediaQris) {
         console.log('✅ [DISPLAY] QRIS dari LZPEDIA:', qrisImage);
@@ -347,7 +384,6 @@ window.showQrisDisplay = function(result, expiryDate, isManual = false) {
 
     const timerDisplay = window.formatTimer ? window.formatTimer(expiryDate) : '30:00';
     
-    // ===== INDIKATOR SUMBER QRIS =====
     const sourceIndicator = isLzpediaQris ? 
         `<div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:8px 12px;margin-bottom:12px;text-align:center;font-size:0.7rem;color:var(--green);">
             ✅ QRIS dari LZPedia - Bisa Dibayar
@@ -395,14 +431,13 @@ window.showQrisDisplay = function(result, expiryDate, isManual = false) {
 
             <div class="qris-timer" id="qrisTimerDisplay">${timerDisplay}</div>
 
-            <!-- QRIS IMAGE -->
             <div class="qris-image-box">
                 <img id="qrisCodeImage" 
                      src="${qrisImage}" 
                      alt="QRIS Code" 
                      style="width:100%; max-width:240px; height:auto; margin:0 auto; display:block;"
                      onload="console.log('✅ [DISPLAY] QRIS loaded successfully!')"
-                     onerror="console.log('❌ [DISPLAY] QRIS load failed'); this.style.display='none'; document.getElementById('qrisFallback').style.display='block';">
+                     onerror="this.style.display='none'; document.getElementById('qrisFallback').style.display='block';">
                 <div id="qrisFallback" style="display:none; text-align:center; padding:20px;">
                     <i class="fas fa-qrcode" style="font-size:3rem; color:var(--text-muted);"></i>
                     <p style="color:var(--text-muted); margin-top:10px;">Gagal memuat QRIS</p>
@@ -457,7 +492,6 @@ window.checkInvoiceStatus = async function(invoiceId) {
                 statusEl.textContent = texts[result.status] || 'Menunggu';
             }
 
-            // UPDATE HISTORY
             const history = getInvoiceHistory();
             const item = history.find(h => h.invoice_id === invoiceId);
             if (item) {
@@ -466,7 +500,6 @@ window.checkInvoiceStatus = async function(invoiceId) {
                 if (typeof renderInvoiceHistory === 'function') renderInvoiceHistory();
             }
 
-            // UPDATE ORDER
             if (typeof updateOrderPaymentStatus === 'function') {
                 updateOrderPaymentStatus(invoiceId, result.status);
             }
@@ -498,7 +531,7 @@ window.checkInvoiceStatus = async function(invoiceId) {
 };
 
 // ============================================================
-// TIMER
+// TIMER FUNCTIONS
 // ============================================================
 
 window.formatTimer = function(expiryDate) {
@@ -682,4 +715,4 @@ window.copyBankInfo = function() {
     }).catch(() => showToast('Error', 'Gagal menyalin', 'error'));
 };
 
-console.log('✅ payment-api.js v12.0 Loaded!');
+console.log('✅ payment-api.js v13.0 Loaded!');
