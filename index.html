@@ -12,7 +12,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    <!-- ✅ TAMBAHKAN INI -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     
@@ -187,6 +186,10 @@
         <div class="tracking-detail-box">
             <h2><i class="fas fa-shopping-bag" style="color:var(--accent-light);"></i> Pesanan Saya</h2>
             <p class="subtitle">Riwayat dan status semua pesanan Anda</p>
+            <div style="background:rgba(99,102,241,0.05);border-radius:10px;padding:12px 16px;margin-bottom:16px;border:1px solid rgba(99,102,241,0.15);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <i class="fas fa-info-circle" style="color:var(--accent-light);"></i>
+                <span style="font-size:0.8rem;color:var(--text-secondary);flex:1;">Klik tombol <strong>"Cek Status"</strong> pada pesanan untuk melihat status pembayaran terbaru.</span>
+            </div>
             <div id="ordersListContainer">
                 <div class="empty-orders">
                     <i class="fas fa-box-open"></i>
@@ -464,7 +467,7 @@
     </div>
 </div>
 
-<!-- ===== LOGIN MODAL (dengan Tab Registrasi/Login) ===== -->
+<!-- LOGIN MODAL -->
 <div class="modal-overlay" id="loginOverlay">
     <div class="modal-box" style="max-width:440px; border: 1px solid rgba(99, 102, 241, 0.3); box-shadow: 0 0 40px rgba(0,0,0,0.6);">
         <button class="modal-close" id="loginCloseBtn"><i class="fas fa-times"></i></button>
@@ -476,13 +479,11 @@
                 <div style="position: absolute; bottom: 0; right: 0; width: 20px; height: 20px; background: var(--green); border-radius: 50%; border: 3px solid var(--bg-card-solid); box-shadow: 0 0 10px var(--green-glow);"></div>
             </div>
 
-            <!-- TAB SWITCHER -->
             <div class="login-tabs" style="display: flex; gap: 8px; background: var(--bg-primary); border-radius: 60px; padding: 4px; margin-bottom: 24px;">
                 <button class="login-tab active" data-tab="login" style="flex:1; padding: 10px; border: none; border-radius: 60px; font-weight: 800; font-size: 0.9rem; cursor: pointer; background: var(--accent); color: #fff; transition: 0.3s;">Masuk</button>
                 <button class="login-tab" data-tab="register" style="flex:1; padding: 10px; border: none; border-radius: 60px; font-weight: 800; font-size: 0.9rem; cursor: pointer; background: transparent; color: var(--text-secondary); transition: 0.3s;">Daftar</button>
             </div>
 
-            <!-- FORM LOGIN -->
             <div id="loginForm" style="display: block;">
                 <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 16px;">Masuk dengan akun yang sudah terdaftar.</p>
                 <div style="display: flex; flex-direction: column; gap: 14px;">
@@ -494,7 +495,6 @@
                 <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="continue_with" data-size="large" data-logo_alignment="left" style="filter: drop-shadow(0 0 10px rgba(99,102,241,0.3));"></div>
             </div>
 
-            <!-- FORM REGISTER -->
             <div id="registerForm" style="display: none;">
                 <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 16px;">Buat akun baru untuk bergabung.</p>
                 <div style="display: flex; flex-direction: column; gap: 14px;">
@@ -594,12 +594,10 @@
 <div class="modal-overlay" id="paymentOverlay">
     <div class="modal-box payment-modal">
         <button class="modal-close" id="paymentCloseBtn"><i class="fas fa-times"></i></button>
-        
-        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:4px;">
-            <i class="fas fa-credit-card" style="color:var(--accent-light);"></i> Pembayaran
-        </h2>
-        <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">Selesaikan pembayaran pesanan Anda</p>
-        
+
+        <h2><i class="fas fa-credit-card" style="color:var(--accent-light);"></i> Pembayaran</h2>
+        <p>Selesaikan pembayaran pesanan Anda</p>
+
         <div class="payment-section">
             <div class="section-label"><i class="fas fa-shopping-bag"></i> Ringkasan Pesanan</div>
             <div class="order-summary-box">
@@ -619,58 +617,23 @@
                 </button>
             </div>
 
+            <!-- QRIS SECTION -->
             <div id="paymentQrisSection">
-                <div class="payment-qris-container" id="qrisContainer">
-                    <div class="qris-placeholder" id="qrisPlaceholder">
-                        <div style="text-align:center;">
-                            <i class="fas fa-qrcode" style="font-size:3rem;color:var(--accent-light);display:block;margin-bottom:8px;"></i>
-                            <p style="font-weight:700;color:var(--text-primary);margin-bottom:4px;">Siap Membuat Invoice</p>
-                            <small style="color:var(--text-muted);display:block;">Klik tombol di bawah untuk generate QRIS dari LZPedia</small>
-                        </div>
-                    </div>
-                    <div id="qrisImageWrapper" style="display:none;">
-                        <img id="qrisImage" src="" alt="QRIS Code" loading="lazy">
-                        <p class="qris-success-text">
-                            <i class="fas fa-check-circle"></i> Scan QRIS untuk membayar
-                        </p>
-                    </div>
-                </div>
-                
-                <div class="payment-details" id="paymentDetails" style="display:none;">
-                    <div class="detail-row">
-                        <span class="label">Invoice ID</span>
-                        <span class="value" id="invoiceId" style="font-family:var(--font-mono);font-size:0.8rem;">-</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Total</span>
-                        <span class="value total" id="invoiceTotal">Rp 0</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Biaya Admin</span>
-                        <span class="value" id="invoiceFee">Rp 0</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Status</span>
-                        <span class="value"><span class="payment-status-badge pending" id="invoiceStatusBadge">⏳ Menunggu</span></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Kadaluarsa</span>
-                        <span class="value" id="invoiceExpiry">-</span>
+                <div id="qrisDisplayContainer">
+                    <div class="qris-placeholder">
+                        <i class="fas fa-qrcode"></i>
+                        <p>Membuat QRIS...</p>
                     </div>
                 </div>
 
-                <div class="payment-timer" id="paymentTimer" style="display:none;">
-                    <i class="fas fa-hourglass-half"></i> <span id="timerDisplay">15:00</span>
-                </div>
-
-                <div class="payment-actions">
-                    <button class="btn-pay" id="createInvoiceBtn"><i class="fas fa-qrcode"></i> Buat Invoice</button>
-                    <button class="btn-check-status" id="checkStatusBtn" style="display:none;"><i class="fas fa-sync-alt"></i> Cek Status</button>
+                <div class="payment-actions" style="padding: 0 24px 16px;">
+                    <button class="btn-pay" id="createInvoiceBtn" style="display:none;"><i class="fas fa-qrcode"></i> Buat Invoice QRIS</button>
                 </div>
             </div>
 
+            <!-- BANK SECTION -->
             <div id="paymentBankSection" style="display:none;">
-                <div class="payment-details">
+                <div class="bank-details">
                     <div class="detail-row">
                         <span class="label">Bank</span>
                         <span class="value">BCA</span>
@@ -688,18 +651,21 @@
                         <span class="value total" id="bankTotal">Rp 0</span>
                     </div>
                 </div>
-                <p style="color:var(--text-muted);font-size:0.8rem;text-align:center;margin:8px 0;">
+                <p style="color:var(--text-muted);font-size:0.8rem;text-align:center;margin:8px 24px;">
                     <i class="fas fa-info-circle"></i> Transfer sesuai total dan kirim bukti ke admin
                 </p>
-                <button class="btn-pay" onclick="copyBankInfo()"><i class="fas fa-copy"></i> Salin Info Bank</button>
+                <div style="padding: 0 24px 16px;">
+                    <button class="btn-copy-bank" onclick="copyBankInfo()"><i class="fas fa-copy"></i> Salin Info Bank</button>
+                </div>
             </div>
         </div>
 
-        <div class="payment-section" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-subtle);">
+        <!-- INVOICE HISTORY -->
+        <div class="invoice-history-section">
             <div class="section-label"><i class="fas fa-file-invoice"></i> Riwayat Invoice Saya</div>
             <div class="invoice-history-list" id="invoiceHistoryList">
-                <div style="text-align:center;padding:20px;color:var(--text-muted);">
-                    <i class="fas fa-file-invoice" style="font-size:2rem;display:block;margin-bottom:8px;opacity:0.5;"></i>
+                <div class="history-empty">
+                    <i class="fas fa-file-invoice"></i>
                     <p>Belum ada invoice</p>
                 </div>
             </div>
