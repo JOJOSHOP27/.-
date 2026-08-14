@@ -256,7 +256,7 @@
             </div>
 
             <div class="profile-footer-info" style="margin-top: 40px; padding: 20px; border-top: 1px solid var(--border-subtle); text-align: center;">
-                <p style="font-size: 0.8rem; color: var(--text-muted);">JOELL SHOP v2.4.0 • Digital Solutions</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted);">JOELL SHOP v2.5.0 • Digital Solutions</p>
             </div>
         </div>
     </div>
@@ -625,10 +625,6 @@
                         <p>Membuat QRIS...</p>
                     </div>
                 </div>
-
-                <div class="payment-actions" style="padding: 0 24px 16px;">
-                    <button class="btn-pay" id="createInvoiceBtn" style="display:none;"><i class="fas fa-qrcode"></i> Buat Invoice QRIS</button>
-                </div>
             </div>
 
             <!-- BANK SECTION -->
@@ -690,9 +686,20 @@
     <button class="nav-item" data-page="profile" id="navProfile"><i class="fas fa-user"></i> Profil</button>
 </nav>
 
-<script src="script.js"></script>
+<!-- ============================================================ -->
+<!-- SCRIPTS - URUTAN PENTING! -->
+<!-- ============================================================ -->
+
+<!-- LZPEDIA JS (untuk serverless) -->
+<script src="lzpedia.js"></script>
+
+<!-- PAYMENT API - FIXED -->
 <script src="payment-api.js"></script>
 
+<!-- SCRIPT UTAMA -->
+<script src="script.js"></script>
+
+<!-- INIT -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ JOELL SHOP Initialized');
@@ -702,6 +709,7 @@
         if (typeof updateUserUI === 'function') updateUserUI();
         if (typeof renderOrdersList === 'function') renderOrdersList();
         if (typeof renderProfilePage === 'function') renderProfilePage();
+        if (typeof renderInvoiceHistory === 'function') renderInvoiceHistory();
         console.log('✅ All systems ready!');
     });
 </script>
